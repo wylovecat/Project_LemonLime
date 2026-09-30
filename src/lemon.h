@@ -20,6 +20,7 @@ namespace Ui {
 class Contest;
 class Settings;
 class OptionsDialog;
+class OnlineServerDialog;
 
 class LemonLime : public QMainWindow {
 	Q_OBJECT
@@ -36,6 +37,7 @@ class LemonLime : public QMainWindow {
 	Ui::LemonLime *ui;
 	Contest *curContest;
 	Settings *settings;
+	OnlineServerDialog *onlineServerDialog{};
 	QFileSystemWatcher *dataDirWatcher;
 	QString curFile;
 	QSignalMapper *signalMapper;
@@ -58,6 +60,7 @@ class LemonLime : public QMainWindow {
 	void refreshSummary();
 	void resetDataWatcher();
 	void showOptionsDialog();
+	void showOnlineServerDialog();
 	void refreshButtonClicked();
 	void cleanupButtonClicked();
 	void tabIndexChanged(int);

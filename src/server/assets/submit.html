@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>提交代码 · LemonLime 在线提交</title>
+<link rel="stylesheet" href="/assets/css/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">← 返回题目列表</a>
+      <span id="countdown" class="countdown" hidden></span>
+      <div class="topbar-right">
+        <a id="statementLink" class="btn btn-ghost" href="/statement" target="_blank" rel="noopener" hidden>题面下载</a>
+        <span class="user-chip">欢迎，<b id="user">…</b></span>
+        <form method="post" action="/logout" class="inline">
+          <button class="btn btn-link" type="submit">退出</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <main class="container submit-main">
+    <section class="task-meta-card">
+      <h1 class="task-meta-title"><span id="taskNo"></span> <span id="taskTitle">…</span></h1>
+      <p class="task-meta-line">
+        <span class="meta-tag">分值 <b id="taskScore">—</b></span>
+        <span class="meta-tag">时限 <b id="taskTime">—</b></span>
+        <span class="meta-tag">源文件 <b id="taskSource">—</b></span>
+      </p>
+    </section>
+
+    <section class="card editor-card">
+      <div class="editor-toolbar">
+        <label class="inline-field">
+          <span>语言</span>
+          <select id="lang">
+            <option value="cpp">C++</option>
+            <option value="c">C</option>
+            <option value="python">Python</option>
+            <option value="pascal">Pascal</option>
+          </select>
+        </label>
+        <label class="inline-field">
+          <span>字号</span>
+          <select id="fontSize">
+            <option>12</option><option selected>14</option><option>16</option><option>18</option>
+          </select>
+        </label>
+        <span class="spacer"></span>
+        <span class="muted small" id="lastSubmitted"></span>
+      </div>
+
+      <div class="editor-wrap">
+        <pre class="line-numbers" aria-hidden="true" id="ln">1</pre>
+        <textarea id="code" class="editor" spellcheck="false" autocomplete="off"
+                  autocorrect="off" autocapitalize="off"
+                  placeholder="在此粘贴或编写代码（Tab 缩进，Ctrl+Enter 提交）"></textarea>
+      </div>
+
+      <div class="editor-foot">
+        <span class="muted small">字符数 <span id="charCount">0</span> / <span id="charMax">65536</span></span>
+        <span class="spacer"></span>
+        <button class="btn btn-primary" id="submitBtn" type="button">提交代码</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="/assets/js/editor.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>renderSubmit();</script>
+</body>
+</html>

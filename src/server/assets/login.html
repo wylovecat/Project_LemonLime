@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>登录 · LemonLime 在线提交</title>
+<link rel="stylesheet" href="/assets/css/app.css" />
+</head>
+<body class="auth-body">
+  <main class="auth-card" role="main">
+    <h1 class="auth-title">LemonLime 在线提交</h1>
+    <p class="auth-sub">请输入由老师下发的账号密码</p>
+    <form method="post" action="/login" autocomplete="off">
+      <label class="field">
+        <span class="field-label">用户名</span>
+        <input class="input" name="username" required autofocus
+               autocomplete="username" inputmode="latin" />
+      </label>
+      <label class="field">
+        <span class="field-label">密码</span>
+        <input class="input" name="password" type="password" required
+               autocomplete="current-password" />
+      </label>
+      <p id="err" class="error" hidden>用户名或密码不正确</p>
+      <button class="btn btn-primary btn-block" type="submit">登 录</button>
+    </form>
+    <p class="auth-foot">系统不开放注册，账号请联系监考老师</p>
+  </main>
+  <script>
+    // toggle error if URL has ?err=1
+    if (new URLSearchParams(location.search).has('err')) {
+      const e = document.getElementById('err');
+      if (e) e.hidden = false;
+    }
+  </script>
+</body>
+</html>

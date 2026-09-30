@@ -26,6 +26,7 @@
 #include "newcontestdialog.h"
 #include "opencontestdialog.h"
 #include "optionsdialog.h"
+#include "server/onlineserverdialog.h"
 #include "statisticsbrowser.h"
 #include "welcomedialog.h"
 //
@@ -64,6 +65,7 @@ LemonLime::LemonLime(QWidget *parent) : QMainWindow(parent), ui(new Ui::LemonLim
 	connect(this, &LemonLime::dataPathChanged, ui->testCaseEdit, &TestCaseEditWidget::dataPathChanged);
 	connect(ui->summary, &SummaryTree::currentItemChanged, this, &LemonLime::summarySelectionChanged);
 	connect(ui->optionsAction, &QAction::triggered, this, &LemonLime::showOptionsDialog);
+	connect(ui->actionOnlineServer, &QAction::triggered, this, &LemonLime::showOnlineServerDialog);
 	connect(ui->cleanupButton, &QPushButton::clicked, this, &LemonLime::cleanupButtonClicked);
 	connect(ui->refreshButton, &QPushButton::clicked, this, &LemonLime::refreshButtonClicked);
 	connect(ui->judgeButton, &QPushButton::clicked, ui->resultViewer, &ResultViewer::judgeSelected);
@@ -121,6 +123,11 @@ void LemonLime::changeEvent(QEvent *event) {
 }
 
 void LemonLime::closeEvent(QCloseEvent * /*event*/) {
+	if (onlineServerDialog) {
+		onlineServerDialog->close();
+		delete onlineServerDialog;
+		onlineServerDialog = nullptr;
+	}
 	if (curContest)
 		saveContest(curFile);
 
@@ -241,6 +248,22 @@ void LemonLime::showOptionsDialog() {
 	ui->resultViewer->refreshViewer();
 	ui->statisticsBrowser->refresh();
 	delete dialog;
+}
+
+void LemonLime::showOnlineServerDialog() {
+	if (! curContest) {
+		QMessageBox::information(
+		    this, tr("在线提交服务"),
+		    tr("请先打开一场比赛。提交服务会绑定到当前打开的比赛。"));
+		return;
+	}
+	if (! onlineServerDialog) {
+		onlineServerDialog = new OnlineServerDialog(this);
+	}
+	onlineServerDialog->bindContest(curContest, QDir::currentPath());
+	onlineServerDialog->show();
+	onlineServerDialog->raise();
+	onlineServerDialog->activateWindow();
 }
 
 void LemonLime::judgeExtButtonFlip(bool stat) {

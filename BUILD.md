@@ -52,7 +52,7 @@ yay -S lemon-lime-git # 开发版本（提前使用许多新功能！）
 # 感谢 @CoelacanthusHex 的支持。
 
 ## 使用 CMake ##
-sudo pacman -S gcc cmake qt6-base qt6-tools ninja 
+sudo pacman -S gcc cmake qt6-base qt6-tools qt6-httpserver ninja 
 cd 源代码的目录
 cmake . -DCMAKE_BUILD_TYPE=Release -GNinja 
 ninja  # 获得可执行文件 lemon
@@ -65,7 +65,7 @@ sudo pacman -S qtcreator
 
 ```bash
 ## 使用 CMake ##
-sudo apt install build-essential ninja-build qt6-tools-dev-tools qt6-base-dev qt6-tools-dev qt6-l10n-tools libgl1-mesa-dev cmake # Qt6 依赖环境
+sudo apt install build-essential ninja-build qt6-tools-dev-tools qt6-base-dev qt6-tools-dev qt6-l10n-tools libqt6httpserver6-dev libgl1-mesa-dev cmake # Qt6 依赖环境
 cd 源代码的目录
 cmake . -DCMAKE_BUILD_TYPE=Release -GNinja 
 ninja  # 获得可执行文件 lemon
@@ -89,7 +89,7 @@ sudo apt install qtcreator
 
 ```bash
 ## 使用 CMake ##
-sudo dnf install cmake qt6-qtbase-devel qt6-qttools-devel qt6-qttools-linguist qt6-qtsvg-devel desktop-file-utils ninja-build
+sudo dnf install cmake qt6-qtbase-devel qt6-qttools-devel qt6-qttools-linguist qt6-qtsvg-devel qt6-qthttpserver-devel desktop-file-utils ninja-build
 cd 源代码的目录
 cmake . -DCMAKE_BUILD_TYPE=Release -GNinja
 ninja # 获得可执行文件 lemon

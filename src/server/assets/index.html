@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>题目列表 · LemonLime 在线提交</title>
+<link rel="stylesheet" href="/assets/css/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">LemonLime 在线提交</a>
+      <span id="countdown" class="countdown" hidden></span>
+      <div class="topbar-right">
+        <a id="statementLink" class="btn btn-ghost" href="/statement" target="_blank" rel="noopener" hidden>题面下载</a>
+        <span class="user-chip">
+          欢迎，<b id="user">…</b>
+        </span>
+        <form method="post" action="/logout" class="inline">
+          <button class="btn btn-link" type="submit">退出</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="contest-banner">
+      <h1 id="contestTitle" class="contest-title">…</h1>
+    </section>
+
+    <section class="card">
+      <table class="task-table" id="taskTable">
+        <thead>
+          <tr>
+            <th class="num-col">#</th>
+            <th>题目</th>
+            <th class="num-col">分值</th>
+            <th>状态</th>
+            <th>最后提交时间</th>
+            <th class="action-col" aria-label="操作"></th>
+          </tr>
+        </thead>
+        <tbody id="taskBody">
+          <tr><td colspan="6" class="muted">加载中…</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/assets/js/app.js"></script>
+  <script>renderIndex();</script>
+</body>
+</html>

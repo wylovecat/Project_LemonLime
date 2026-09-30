@@ -1,0 +1,146 @@
+============================================================
+ LemonLime Online — Windows 编译指南
+============================================================
+
+【一次性环境准备】
+
+1. Visual Studio 2022 Build Tools（提供 MSVC）
+   下载: https://visualstudio.microsoft.com/zh-hans/downloads/
+   安装时勾选 "使用 C++ 的桌面开发" 工作负载
+
+2. Qt 6.8 或更高版本（必须含 HttpServer 模块）
+   下载: https://www.qt.io/download-qt-installer
+   安装时勾选:
+     - Qt 6.9.x → MSVC 2022 64-bit
+     - Additional Libraries → Qt HTTP Server  ← 关键，默认不勾
+   建议安装到默认路径: C:\Qt\
+
+3. CMake
+   下载: https://cmake.org/download/
+   安装时勾选 "Add CMake to the system PATH"
+
+4. Ninja
+   下载: https://github.com/ninja-build/ninja/releases (ninja-win.zip)
+   解压后把 ninja.exe 放到 PATH 里能找到的位置
+   (例如 C:\Tools\ninja\，然后把 C:\Tools\ninja 加到系统 PATH)
+
+
+============================================================
+【编译步骤】
+============================================================
+
+1. 解压本 zip 到一个无空格无中文的路径，例如:
+   C:\Users\你\Desktop\lemon_online\
+   (路径含中文/空格会引起奇怪的链接问题)
+
+2. 开始菜单搜 "x64 Native Tools Command Prompt for VS 2022"
+   ⚠️ 必须是 x64 那个，不是 x86，也不是普通 Developer Command Prompt
+   打开后跑:
+        where cl
+   确认输出包含 Hostx64\x64
+
+3. 在该 cmd 窗口执行（命令必须单行，不要换行）:
+
+   cd /d C:\Users\你\Desktop\lemon_online
+   mkdir build
+   cd build
+   cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\Qt\6.9.3\msvc2022_64
+   ninja
+
+   把 6.9.3 换成你实际装的 Qt 版本号
+   (用 dir C:\Qt 看实际目录名)
+
+4. 编译完成后:
+   - 产物: build\lemon.exe
+   - 直接双击会缺 Qt dll，需要先 deploy:
+
+     C:\Qt\6.9.3\msvc2022_64\bin\windeployqt.exe --release lemon.exe
+
+   - 之后双击 build\lemon.exe 即可启动
+
+
+============================================================
+【打包成可分发的绿色版（可选）】
+============================================================
+
+在 build 目录里跑（cmd 单行）:
+
+   set DEPLOY_DIR=C:\Users\你\Desktop\LemonLime-Online
+   set QT_DIR=C:\Qt\6.9.3\msvc2022_64
+   if exist "%DEPLOY_DIR%" rmdir /S /Q "%DEPLOY_DIR%"
+   mkdir "%DEPLOY_DIR%"
+   copy /Y lemon.exe "%DEPLOY_DIR%\"
+   "%QT_DIR%\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw "%DEPLOY_DIR%\lemon.exe"
+
+跑完后整个 LemonLime-Online 文件夹拷到任意 Windows 机器都能直接运行
+（不需要装 Qt）。打 zip 分发约 30~50 MB。
+
+
+============================================================
+【常见错误对照】
+============================================================
+
+╔══════════════════════════════════════════════════════════╗
+║ Could NOT find Qt6 (missing: HttpServer)                ║
+║   → Qt 安装时没勾 HTTP Server 模块                      ║
+║   → 重跑 Qt 维护工具勾上                                ║
+╠══════════════════════════════════════════════════════════╣
+║ cmake 不是内部或外部命令                                ║
+║   → CMake 没装或没加 PATH                               ║
+║   → 重装 CMake 时勾上 "Add to PATH"                     ║
+╠══════════════════════════════════════════════════════════╣
+║ Ignoring extra path from command line: "`"              ║
+║   → 你用 cmd 但写了 PowerShell 风格的反引号续行         ║
+║   → 命令必须单行，不要换行                              ║
+╠══════════════════════════════════════════════════════════╣
+║ MSVC 检测到 Hostx86/x86 而不是 Hostx64/x64              ║
+║   → 你打开了 x86 版的命令提示符                         ║
+║   → 重开 "x64 Native Tools Command Prompt for VS 2022"  ║
+╠══════════════════════════════════════════════════════════╣
+║ windeployqt 后 exe 仍然报缺 dll                         ║
+║   → 用错了 windeployqt（比如 mingw 那个）               ║
+║   → 确认是 C:\Qt\xxx\msvc2022_64\bin\windeployqt.exe   ║
+╠══════════════════════════════════════════════════════════╣
+║ 评测时报 "Failed to create process"                     ║
+║   不是 lemon 编译的问题，是 g++ 没配                    ║
+║   1. 装 MinGW-w64 (winlibs.com 单 zip 最省事)           ║
+║   2. 把 C:\mingw64\bin 加到系统 PATH                    ║
+║   3. LemonLime → Tools → Settings → Compiler            ║
+║      Compiler location 填绝对路径 C:\mingw64\bin\g++.exe║
+║   4. 编译参数里加 -static 否则学生程序缺 libstdc++ dll  ║
+║   5. 比赛目录加进 Windows Defender 排除项               ║
+║   详细错误码可以看日志: %LOCALAPPDATA%\Lemonlime\logs\  ║
+╚══════════════════════════════════════════════════════════╝
+
+
+============================================================
+【新增功能简介（区别于上游 LemonLime）】
+============================================================
+
+- 菜单 Tools → 在线提交服务...
+  启动一个 HTTP 服务（默认 8080），让学生用浏览器登录后提交代码
+
+- 账号体系
+  Tools → 在线提交服务 → 批量生成
+  会生成账号密码 CSV 落到比赛目录 (online_users_passwords.csv)
+  不开放注册，账号只能由教师生成
+
+- 学生端用法
+  浏览器访问 http://老师机IP:8080
+  登录 → 选题 → 写代码 → 提交
+  同一题多次提交以最后一次为准
+
+- 比赛时间窗口
+  在线提交服务对话框 → 比赛时间分组
+  设定开始/结束时间，时间外服务端拒绝提交，前端显示倒计时
+
+- 提交后立即评测
+  默认开启，学生提交后老师机自动评测，结果实时出现在主窗口
+
+- 题面 PDF
+  把 statement.pdf 放到比赛目录（或在对话框点"设定..."选择文件）
+  学生页面会出现"题面"下载按钮
+
+
+如有问题贴 cmake/ninja 的完整输出 + lemon.exe 启动后的日志:
+    %LOCALAPPDATA%\Lemonlime\logs\lemonlime-log.txt

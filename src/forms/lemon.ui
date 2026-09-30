@@ -500,6 +500,8 @@
     <property name="title">
      <string>&amp;Tools</string>
     </property>
+    <addaction name="actionOnlineServer"/>
+    <addaction name="separator"/>
     <addaction name="optionsAction"/>
    </widget>
    <widget class="QMenu" name="helpMenu">
@@ -582,6 +584,18 @@
    </property>
    <property name="statusTip">
     <string>LemonLime Settings...</string>
+   </property>
+  </action>
+  <action name="actionOnlineServer">
+   <property name="icon">
+    <iconset resource="../../resource.qrc">
+     <normaloff>:/icon/globe.svg</normaloff>:/icon/globe.svg</iconset>
+   </property>
+   <property name="text">
+    <string>在线提交服务...</string>
+   </property>
+   <property name="statusTip">
+    <string>启动 HTTP 服务，让学生通过浏览器提交代码</string>
    </property>
   </action>
   <action name="aboutAction">

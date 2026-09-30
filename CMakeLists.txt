@@ -54,13 +54,20 @@ if(NOT Qt_DIR AND DEFINED Qt${LEMON_QT_MAJOR_VERSION}_DIR)
     set(Qt_DIR ${Qt${LEMON_QT_MAJOR_VERSION}_DIR})
 endif()
 
-find_package(Qt${LEMON_QT_MAJOR_VERSION} ${LEMON_QT_MIN_VERSION} COMPONENTS Core Gui Widgets REQUIRED)
+find_package(Qt${LEMON_QT_MAJOR_VERSION} ${LEMON_QT_MIN_VERSION}
+    COMPONENTS Core Gui Widgets Network HttpServer Concurrent REQUIRED)
 
 set(LEMON_QT_LIBNAME Qt${LEMON_QT_MAJOR_VERSION})
 
 add_definitions(-DQT_NO_FOREACH)
 
-list(APPEND LEMON_QT_LIBS ${LEMON_QT_LIBNAME}::Core ${LEMON_QT_LIBNAME}::Gui ${LEMON_QT_LIBNAME}::Widgets)
+list(APPEND LEMON_QT_LIBS
+    ${LEMON_QT_LIBNAME}::Core
+    ${LEMON_QT_LIBNAME}::Gui
+    ${LEMON_QT_LIBNAME}::Widgets
+    ${LEMON_QT_LIBNAME}::Network
+    ${LEMON_QT_LIBNAME}::HttpServer
+    ${LEMON_QT_LIBNAME}::Concurrent)
 
 set(SINGLEAPPLICATION_DIR ${CMAKE_SOURCE_DIR}/3rdparty/SingleApplication)
 set(QAPPLICATION_CLASS QApplication CACHE STRING "Inheritance class for SingleApplication")
@@ -214,6 +221,12 @@ include(cmake/lemon-core.cmake)
 include(cmake/LemonDocs.cmake)
     
 # ==================================================================================
+# Lemon Online Server
+# ==================================================================================
+
+include(cmake/lemon-server.cmake)
+
+# ==================================================================================
 # Lemon UI
 # ==================================================================================
 
@@ -249,12 +262,14 @@ set_target_properties(lupdate PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 set(QRC_RESOURCES
     resource.qrc
+    src/server/server-assets.qrc
     ${LEMON_EMBED_DOC_QRC}
     )
 
 set(LEMON_FULL_SOURCES
     ${LEMON_BASE_SOURCES}
     ${LEMON_CORE_SOURCES}
+    ${LEMON_SERVER_SOURCES}
     ${LEMON_UI_SOURCES}
     assets/lemon.rc
     ${LEMON_UI_FORMS}
