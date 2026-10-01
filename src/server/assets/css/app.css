@@ -117,6 +117,15 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   cursor: pointer; transition: background-color 150ms ease;
 }
 .task-table tbody tr:hover { background: #F8FAFC; }
+.task-table tbody tr.no-hover:hover { background: transparent; cursor: default; }
+.locked-cell {
+  text-align: center; padding: 48px 20px !important;
+  background: #F8FAFC;
+}
+.locked-title {
+  font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 6px;
+}
+.locked-sub { color: var(--text-soft); font-size: 14px; }
 .task-table .num-col { width: 80px; font-variant-numeric: tabular-nums; }
 .task-table .action-col { width: 40px; text-align: right; color: var(--text-muted); }
 
@@ -199,6 +208,33 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .meta-tag { display: inline-flex; gap: 4px; }
 
 .editor-card { padding: 0; }
+
+.file-zone { padding: 20px; background: var(--surface); }
+.file-zone-inner {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px;
+  padding: 40px 20px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: #F8FAFC;
+  text-align: center;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+.file-zone-inner.is-drag {
+  border-color: var(--primary);
+  background: #F7FEE7;
+}
+.file-zone-inner.has-file {
+  border-style: solid;
+  border-color: var(--primary);
+  background: #F7FEE7;
+}
+.file-zone-icon {
+  font-size: 36px; line-height: 1; color: var(--text-muted);
+}
+.file-zone-title { font-size: 15px; color: var(--text); }
+.file-zone-sub   { font-size: 13px; color: var(--text-muted); }
+
 .editor-toolbar {
   display: flex; align-items: center; gap: 16px;
   padding: 12px 16px; border-bottom: 1px solid var(--border);
@@ -241,6 +277,74 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 .editor-foot .spacer { flex: 1; }
 
+/* Modal */
+.modal {
+  display: none;
+  position: fixed; inset: 0; z-index: 80;
+  align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal.is-open { display: flex; }
+.modal-overlay {
+  position: absolute; inset: 0;
+  background: rgba(15, 23, 42, .42);
+  animation: modal-fade 150ms ease-out;
+}
+.modal-card {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, .25);
+  width: min(900px, 100%);
+  max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: modal-pop 200ms ease-out;
+}
+.modal-head {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.modal-close {
+  margin-left: auto;
+  background: transparent; border: 0;
+  width: 28px; height: 28px;
+  border-radius: 4px; cursor: pointer;
+  font-size: 20px; line-height: 1; color: var(--text-soft);
+  transition: background-color 150ms ease;
+}
+.modal-close:hover { background: #F1F5F9; color: var(--text); }
+.modal-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
+  font-size: 13px; color: var(--text-soft);
+  background: #FAFBFC;
+}
+.modal-code {
+  margin: 0; padding: 16px 20px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Menlo', monospace;
+  font-size: 13px; line-height: 1.55; color: var(--text);
+  white-space: pre; overflow: auto;
+  flex: 1; background: #FAFAFA;
+  tab-size: 4;
+}
+.row-action {
+  color: var(--primary-hover); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+  font-size: 13px;
+}
+.row-action:hover { color: #15803D; }
+.task-table .view-col { width: 64px; text-align: center; }
+@keyframes modal-fade {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes modal-pop {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Toast */
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
@@ -272,5 +376,385 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   *, *::before, *::after {
     animation-duration: 0ms !important;
     transition-duration: 0ms !important;
+  }
+}
+
+/* =========================================================================
+ *  THEME: 北京活动风 (data-theme="beijing")
+ *  顶部青绿渐变条 + 左侧深蓝侧栏 + 主区电路装饰 + 政务绿 CTA。
+ * ========================================================================= */
+
+/* hide beijing chrome by default; only show under [data-theme="beijing"] */
+.bj-header, .bj-sidebar, .bj-mosaic, .bj-deco,
+.bj-login-wrap, .bj-countdown-label,
+.bj-task-card { /* fall back to .card visuals in default theme */ }
+.bj-header, .bj-sidebar, .bj-mosaic, .bj-deco { display: none; }
+.bj-countdown-label { display: none; }
+
+/* ---- Theme tokens ---- */
+[data-theme="beijing"] {
+  --primary: #5CB85C;
+  --primary-hover: #449D44;
+  --bg: #F2F5FA;
+  --surface: #FFFFFF;
+  --border: #DCE3EC;
+  --text: #1E2A3F;
+  --text-soft: #4A5A78;
+  --text-muted: #8FA0BA;
+  --shadow: 0 1px 2px rgba(30, 42, 63, .06), 0 8px 20px rgba(30, 42, 63, .08);
+
+  --bj-header-h: 64px;
+  --bj-side-w: 240px;
+  --bj-cyan-1: #2BA9CC;
+  --bj-cyan-2: #4FC3D6;
+  --bj-cyan-3: #5BD0DA;
+  --bj-side-bg: #2A4374;
+  --bj-side-bg-2: #344F88;
+  --bj-side-text: #DDE5F2;
+  --bj-active-green: #5CB85C;
+  --bj-active-green-2: #449D44;
+}
+
+/* ---- Default theme: keep classic topbar visible ---- */
+[data-theme="default"] .topbar { display: block; }
+[data-theme="beijing"] .topbar { display: none; }
+
+/* ---- Beijing layout: header + sidebar + main grid ---- */
+body[data-theme="beijing"] {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  padding: var(--bj-header-h) 0 0 var(--bj-side-w);
+}
+/* override default container centering when the page uses beijing theme */
+body[data-theme="beijing"] .container {
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+/* ---- Top header bar ---- */
+[data-theme="beijing"] .bj-header {
+  display: flex;
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--bj-header-h);
+  background: linear-gradient(90deg, var(--bj-cyan-1) 0%, var(--bj-cyan-2) 55%, var(--bj-cyan-3) 100%);
+  align-items: center;
+  padding: 0 28px;
+  z-index: 30;
+  box-shadow: 0 2px 10px rgba(43, 169, 204, .25);
+}
+[data-theme="beijing"] .bj-header-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #FFFFFF;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .15);
+  flex: 1;
+}
+[data-theme="beijing"] .bj-header-logout-form { display: inline; }
+[data-theme="beijing"] .bj-logout-btn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, .65);
+  color: #FFFFFF;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+[data-theme="beijing"] .bj-logout-btn:hover {
+  background: rgba(255, 255, 255, .15);
+}
+
+/* ---- Left sidebar ---- */
+[data-theme="beijing"] .bj-sidebar {
+  display: block;
+  position: fixed;
+  top: var(--bj-header-h);
+  left: 0;
+  bottom: 0;
+  width: var(--bj-side-w);
+  background: linear-gradient(180deg, var(--bj-side-bg) 0%, var(--bj-side-bg-2) 100%);
+  color: var(--bj-side-text);
+  z-index: 20;
+  overflow-y: auto;
+}
+[data-theme="beijing"] .bj-sb-row,
+[data-theme="beijing"] .bj-sb-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 22px;
+  font-size: 14px;
+  color: var(--bj-side-text);
+  text-decoration: none;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, .06);
+}
+[data-theme="beijing"] .bj-sb-row:first-child,
+[data-theme="beijing"] .bj-sb-menu .bj-sb-item:first-child { border-top: 0; }
+[data-theme="beijing"] .bj-sb-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px;
+  font-size: 14px;
+  opacity: .9;
+}
+[data-theme="beijing"] .bj-sb-clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+[data-theme="beijing"] .bj-sb-user { font-weight: 600; }
+[data-theme="beijing"] .bj-sb-menu {
+  display: flex; flex-direction: column;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, .06);
+}
+[data-theme="beijing"] .bj-sb-item {
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+[data-theme="beijing"] .bj-sb-item:hover {
+  background: rgba(255, 255, 255, .06);
+  color: #FFFFFF;
+}
+[data-theme="beijing"] .bj-sb-item.is-active {
+  background: linear-gradient(90deg, var(--bj-active-green) 0%, var(--bj-active-green-2) 100%);
+  color: #FFFFFF;
+  font-weight: 600;
+  border-color: transparent;
+  box-shadow: inset 4px 0 0 #FFFFFF80;
+}
+[data-theme="beijing"] .bj-sb-item.is-active .bj-sb-icon { opacity: 1; }
+[data-theme="beijing"] .bj-sb-disabled {
+  opacity: .55;
+  cursor: default;
+}
+[data-theme="beijing"] .bj-sb-disabled:hover {
+  background: transparent;
+  color: var(--bj-side-text);
+}
+
+/* ---- Main content area ---- */
+[data-theme="beijing"] .container {
+  position: relative;
+  max-width: none;
+  margin: 0;
+  padding: 28px 32px;
+  min-height: calc(100vh - var(--bj-header-h));
+}
+
+/* hexagonal cyan tech decoration behind content (decorative, low opacity) */
+[data-theme="beijing"] .bj-deco {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .35;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: 720px 720px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 720 720'><defs><pattern id='circuit' x='0' y='0' width='40' height='40' patternUnits='userSpaceOnUse'><path d='M0,20 L40,20 M20,0 L20,40' stroke='%23A7E1EA' stroke-width='0.5' fill='none' opacity='0.4'/><circle cx='20' cy='20' r='1.4' fill='%23A7E1EA'/></pattern></defs><polygon points='360,80 600,200 600,440 360,560 120,440 120,200' fill='url(%23circuit)' stroke='%2378D5DF' stroke-width='2'/><polygon points='360,140 540,230 540,400 360,490 180,400 180,230' fill='none' stroke='%23A0E2EB' stroke-width='1.5' stroke-dasharray='6,4'/><polygon points='360,210 480,260 480,360 360,420 240,360 240,260' fill='none' stroke='%23BCEAF1' stroke-width='1'/><circle cx='130' cy='100' r='14' fill='none' stroke='%2378D5DF' stroke-width='2'/><circle cx='590' cy='620' r='22' fill='none' stroke='%2378D5DF' stroke-width='2'/><circle cx='80' cy='540' r='10' fill='%2378D5DF' opacity='0.6'/><circle cx='640' cy='120' r='8' fill='%2378D5DF' opacity='0.6'/></svg>");
+}
+
+[data-theme="beijing"] .contest-banner {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  margin-bottom: 14px;
+}
+[data-theme="beijing"] .contest-title {
+  color: #1E2A3F;
+  border-left: 4px solid var(--bj-cyan-1);
+  padding-left: 12px;
+  font-size: 18px;
+}
+
+/* big inline countdown label (in main area, above table) */
+[data-theme="beijing"] .bj-countdown-label {
+  display: inline-block;
+  margin-left: 16px;
+  color: #1E2A3F;
+  font-size: 14px;
+}
+[data-theme="beijing"] .bj-countdown-label b {
+  color: var(--bj-cyan-1);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+}
+
+/* hide the topbar countdown in beijing (we use the bj-countdown-label instead) */
+[data-theme="beijing"] #countdown { display: none; }
+
+[data-theme="beijing"] .card {
+  position: relative;
+  z-index: 1;
+  border-radius: 8px;
+  border-top: 3px solid var(--bj-cyan-1);
+}
+
+/* ---- task table (Beijing styling) ---- */
+[data-theme="beijing"] .task-table thead th {
+  background: #EAF1F7;
+  color: #2A4374;
+  font-weight: 600;
+}
+[data-theme="beijing"] .task-table tbody tr:hover { background: #F1F7FB; }
+[data-theme="beijing"] .status-pill.is-submitted { color: var(--bj-active-green-2); }
+[data-theme="beijing"] .status-pill.is-submitted::before { background: var(--bj-active-green); }
+[data-theme="beijing"] .row-action { color: var(--bj-cyan-1); }
+[data-theme="beijing"] .row-action:hover { color: #1B8FB1; }
+
+/* ---- task meta + editor on submit page ---- */
+[data-theme="beijing"] .task-meta-card {
+  position: relative;
+  z-index: 1;
+  border-top: 3px solid var(--bj-cyan-1);
+}
+[data-theme="beijing"] .editor-toolbar { background: #EAF1F7; }
+[data-theme="beijing"] .editor-foot    { background: #EAF1F7; }
+[data-theme="beijing"] .line-numbers   { background: #F1F7FB; }
+
+/* ---- file dropzone ---- */
+[data-theme="beijing"] .file-zone-inner {
+  background: #F1F7FB;
+  border-color: #C7DCEB;
+}
+[data-theme="beijing"] .file-zone-inner.is-drag,
+[data-theme="beijing"] .file-zone-inner.has-file {
+  background: #E8F6E8;
+  border-color: var(--bj-active-green);
+}
+
+/* ---- buttons ---- */
+[data-theme="beijing"] .btn-primary {
+  background: var(--bj-active-green);
+  color: #FFFFFF;
+  border: 1px solid var(--bj-active-green-2);
+  box-shadow: 0 1px 0 rgba(0,0,0,.04);
+}
+[data-theme="beijing"] .btn-primary:hover {
+  background: var(--bj-active-green-2);
+}
+[data-theme="beijing"] .btn-primary[disabled] {
+  background: #B5DEB5;
+  color: #FFFFFF;
+  border-color: #A0D2A0;
+}
+
+/* ---- inputs focus ring ---- */
+[data-theme="beijing"] .input:focus,
+[data-theme="beijing"] .editor:focus,
+[data-theme="beijing"] select:focus,
+[data-theme="beijing"] :focus-visible { outline-color: var(--bj-cyan-1); border-color: var(--bj-cyan-1); }
+
+/* ---- locked banner ---- */
+[data-theme="beijing"] .locked-cell {
+  background: linear-gradient(180deg, #F1F7FB 0%, #EAF1F7 100%);
+}
+[data-theme="beijing"] .locked-title { color: #2A4374; }
+
+/* ---- toast ---- */
+[data-theme="beijing"] .toast {
+  background: linear-gradient(90deg, var(--bj-cyan-1), var(--bj-cyan-2));
+}
+[data-theme="beijing"] .toast.is-error { background: #DC2626; }
+
+/* ---- modal accents ---- */
+[data-theme="beijing"] .modal-card { border-top: 3px solid var(--bj-cyan-1); }
+[data-theme="beijing"] .modal-meta { background: #EAF1F7; }
+.modal-notice { padding: 18px 22px; line-height: 1.7; color: var(--text-soft); }
+.modal-notice p { margin: 0 0 6px; }
+
+/* =========================================================================
+ *  Login page (Beijing) — left card on dark-blue + right SVG mosaic
+ * ========================================================================= */
+[data-theme="beijing"].auth-body {
+  background: radial-gradient(ellipse at top right, #1849A9 0%, #0E2F87 55%, #0A1F5C 100%);
+  padding: 0;
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+[data-theme="beijing"].auth-body .auth-card {
+  width: 360px;
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  left: 9%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, .97);
+  border: 1px solid rgba(255, 255, 255, .8);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
+  z-index: 2;
+}
+[data-theme="beijing"].auth-body .auth-title { color: #1E2A3F; }
+[data-theme="beijing"].auth-body .field-label { color: #4A5A78; }
+[data-theme="beijing"] .bj-login-arrow {
+  display: inline-block;
+  margin-right: 6px;
+  transform: translateY(-1px);
+}
+
+/* SVG geometric mosaic on the right half */
+[data-theme="beijing"] .bj-mosaic {
+  display: block;
+  position: absolute;
+  top: var(--bj-header-h);
+  bottom: 0;
+  right: 0;
+  width: 55%;
+  z-index: 1;
+}
+[data-theme="beijing"] .bj-mosaic svg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+}
+
+/* spotlight glows on login background (decorative) */
+[data-theme="beijing"].auth-body::before {
+  content: "";
+  position: absolute;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 196, 214, .35), transparent 70%);
+  top: 220px; left: 30px;
+  pointer-events: none;
+  z-index: 1;
+}
+[data-theme="beijing"].auth-body::after {
+  content: "";
+  position: absolute;
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .5);
+  top: 65%; left: 28%;
+  filter: blur(2px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---- responsive ---- */
+@media (max-width: 900px) {
+  body[data-theme="beijing"] {
+    padding-left: 0;
+  }
+  [data-theme="beijing"] .bj-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+  [data-theme="beijing"] .bj-sb-menu {
+    flex-direction: row; flex-wrap: wrap;
+  }
+  [data-theme="beijing"] .bj-sb-item { flex: 1 0 50%; }
+  [data-theme="beijing"] .bj-mosaic { display: none; }
+  [data-theme="beijing"].auth-body .auth-card {
+    position: static;
+    transform: none;
+    margin: 30px auto;
+    left: auto;
+    top: auto;
   }
 }

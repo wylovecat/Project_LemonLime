@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>提交代码 · LemonLime 在线提交</title>
+<link rel="stylesheet" href="/assets/css/app.css" />
+</head>
+<body data-theme="beijing">
+  <!-- Beijing-theme: top bar -->
+  <header class="bj-header">
+    <h1 class="bj-header-title">在线提交系统</h1>
+    <form method="post" action="/logout" class="bj-header-logout-form">
+      <button class="bj-logout-btn" type="submit">退出登录</button>
+    </form>
+  </header>
+
+  <!-- Beijing-theme: left sidebar -->
+  <aside class="bj-sidebar">
+    <div class="bj-sb-row bj-sb-clock">
+      <span class="bj-sb-icon" aria-hidden="true">🕒</span>
+      <span id="bjClock">--:--:--</span>
+    </div>
+    <div class="bj-sb-row bj-sb-user">
+      <span class="bj-sb-icon" aria-hidden="true">👤</span>
+      <span id="bjUser">…</span>
+    </div>
+    <nav class="bj-sb-menu">
+      <a class="bj-sb-item" href="#" data-bj-action="notice">
+        <span class="bj-sb-icon" aria-hidden="true">ⓘ</span> 考试须知
+      </a>
+      <a class="bj-sb-item" id="bjStatementLink" href="/statement" target="_blank" rel="noopener">
+        <span class="bj-sb-icon" aria-hidden="true">⬇</span> 试题下载
+      </a>
+      <a class="bj-sb-item is-active" href="/" aria-current="page">
+        <span class="bj-sb-icon" aria-hidden="true">✎</span> 答题
+      </a>
+      <a class="bj-sb-item bj-sb-disabled" href="#" data-bj-action="messages">
+        <span class="bj-sb-icon" aria-hidden="true">✉</span> <span id="bjMsgCount">0</span> 条未读消息
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Default-theme: top bar -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">← 返回题目列表</a>
+      <span id="countdown" class="countdown" hidden></span>
+      <div class="topbar-right">
+        <a id="statementLink" class="btn btn-ghost" href="/statement" target="_blank" rel="noopener" hidden>题面下载</a>
+        <span class="user-chip">欢迎，<b id="user">…</b></span>
+        <form method="post" action="/logout" class="inline">
+          <button class="btn btn-link" type="submit">退出</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <main class="container submit-main">
+    <div class="bj-deco" aria-hidden="true"></div>
+    <section class="task-meta-card">
+      <h1 class="task-meta-title"><span id="taskNo"></span> <span id="taskTitle">…</span></h1>
+      <p class="task-meta-line">
+        <span class="meta-tag">分值 <b id="taskScore">—</b></span>
+        <span class="meta-tag">时限 <b id="taskTime">—</b></span>
+        <span class="meta-tag">源文件 <b id="taskSource">—</b></span>
+        <span class="spacer"></span>
+        <span id="bjCountdownLabel" class="bj-countdown-label" hidden>
+          考试剩余：<b id="bjCountdownText">--:--:--</b>
+        </span>
+      </p>
+    </section>
+
+    <section class="card editor-card">
+      <div class="editor-toolbar">
+        <label class="inline-field">
+          <span>语言</span>
+          <select id="lang">
+            <option value="cpp">C++</option>
+            <option value="c">C</option>
+            <option value="python">Python</option>
+            <option value="pascal">Pascal</option>
+          </select>
+        </label>
+        <label class="inline-field" id="fontSizeField">
+          <span>字号</span>
+          <select id="fontSize">
+            <option>12</option><option selected>14</option><option>16</option><option>18</option>
+          </select>
+        </label>
+        <span class="spacer"></span>
+        <span class="muted small" id="lastSubmitted"></span>
+      </div>
+
+      <div id="pasteMode">
+        <div class="editor-wrap">
+          <pre class="line-numbers" aria-hidden="true" id="ln">1</pre>
+          <textarea id="code" class="editor" spellcheck="false" autocomplete="off"
+                    autocorrect="off" autocapitalize="off"
+                    placeholder="在此粘贴或编写代码（Tab 缩进，Ctrl+Enter 提交）"></textarea>
+        </div>
+      </div>
+
+      <div id="fileMode" class="file-zone" hidden>
+        <input id="fileInput" type="file" hidden
+               accept=".cpp,.cc,.cxx,.c,.py,.pas,.pp,.txt" />
+        <div class="file-zone-inner" id="fileDrop">
+          <div class="file-zone-icon" aria-hidden="true">↥</div>
+          <div class="file-zone-title" id="fileTitle">点击选择，或将代码文件拖到此处</div>
+          <div class="file-zone-sub" id="fileSub">支持 .cpp / .c / .py / .pas（≤ 64 KB）</div>
+          <button type="button" class="btn btn-ghost" id="filePickBtn">选择文件...</button>
+        </div>
+      </div>
+
+      <div class="editor-foot">
+        <span class="muted small" id="sizeText">字节数 <span id="charCount">0</span> / <span id="charMax">65536</span></span>
+        <span class="spacer"></span>
+        <button class="btn btn-primary" id="submitBtn" type="button">提交代码</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <div id="noticeModal" class="modal">
+    <div class="modal-overlay" data-modal-close="1"></div>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <header class="modal-head">
+        <h2>考试须知</h2>
+        <button type="button" class="modal-close" data-modal-close="1" aria-label="关闭">×</button>
+      </header>
+      <div class="modal-meta"><span class="muted">来自比赛主办方</span></div>
+      <div class="modal-notice">
+        <p>1. 请认真审题，独立完成提交。</p>
+        <p>2. 同一题多次提交，以最后一次为准。</p>
+        <p>3. 提交内容大小限制为 64 KB；超过会被拒绝。</p>
+        <p>4. 比赛时间窗口外不可提交，倒计时结束后系统自动锁定。</p>
+        <p>5. 如遇系统异常或网络问题，请立即联系监考老师。</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/editor.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>renderSubmit();</script>
+</body>
+</html>

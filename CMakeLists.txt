@@ -29,6 +29,8 @@ option(ENABLE_LTO "Link-Time Optimization" ON)
 LEMONLOG(ENABLE_LTO)
 option(ENABLE_CCACHE "Ccache speed up compile (Only support Makefile and Ninja now)" OFF)
 LEMONLOG(ENABLE_CCACHE)
+option(ENABLE_ONLINE_SERVER "Embedded HTTP online submission service (needs the Qt HttpServer module)" ON)
+LEMONLOG(ENABLE_ONLINE_SERVER)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTORCC ON)
@@ -55,7 +57,22 @@ if(NOT Qt_DIR AND DEFINED Qt${LEMON_QT_MAJOR_VERSION}_DIR)
 endif()
 
 find_package(Qt${LEMON_QT_MAJOR_VERSION} ${LEMON_QT_MIN_VERSION}
-    COMPONENTS Core Gui Widgets Network HttpServer Concurrent REQUIRED)
+    COMPONENTS Core Gui Widgets Network Concurrent REQUIRED)
+
+# The online submission service needs Qt HttpServer. The module is unchecked by
+# default in the Qt online installer and is missing from most prebuilt static Qt
+# builds, so it is looked up separately and can be switched off.
+if(ENABLE_ONLINE_SERVER)
+    find_package(Qt${LEMON_QT_MAJOR_VERSION} ${LEMON_QT_MIN_VERSION} QUIET COMPONENTS HttpServer)
+    if(NOT TARGET Qt${LEMON_QT_MAJOR_VERSION}::HttpServer)
+        message(FATAL_ERROR
+            "Qt${LEMON_QT_MAJOR_VERSION}::HttpServer was not found. The embedded online submission "
+            "service needs it (Qt ${LEMON_QT_MIN_VERSION}+; in the Qt installer the module is unchecked "
+            "by default, distributions package it as qt6-httpserver / libqt6httpserver6-dev / "
+            "qt6-qthttpserver-devel).\n"
+            "Configure with -DENABLE_ONLINE_SERVER=OFF to build LemonLime without the online submission service.")
+    endif()
+endif()
 
 set(LEMON_QT_LIBNAME Qt${LEMON_QT_MAJOR_VERSION})
 
@@ -66,8 +83,11 @@ list(APPEND LEMON_QT_LIBS
     ${LEMON_QT_LIBNAME}::Gui
     ${LEMON_QT_LIBNAME}::Widgets
     ${LEMON_QT_LIBNAME}::Network
-    ${LEMON_QT_LIBNAME}::HttpServer
     ${LEMON_QT_LIBNAME}::Concurrent)
+
+if(ENABLE_ONLINE_SERVER)
+    list(APPEND LEMON_QT_LIBS ${LEMON_QT_LIBNAME}::HttpServer)
+endif()
 
 set(SINGLEAPPLICATION_DIR ${CMAKE_SOURCE_DIR}/3rdparty/SingleApplication)
 set(QAPPLICATION_CLASS QApplication CACHE STRING "Inheritance class for SingleApplication")
@@ -262,7 +282,7 @@ set_target_properties(lupdate PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 set(QRC_RESOURCES
     resource.qrc
-    src/server/server-assets.qrc
+    ${LEMON_SERVER_RESOURCES}
     ${LEMON_EMBED_DOC_QRC}
     )
 
@@ -301,6 +321,10 @@ else()
 endif()
 
 target_include_directories(lemon PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
+if(ENABLE_ONLINE_SERVER)
+    target_compile_definitions(lemon PRIVATE LEMON_ONLINE_SERVER)
+endif()
 
 if(WIN32 AND ENABLE_XLS_EXPORT)
     find_package(${LEMON_QT_LIBNAME} COMPONENTS AxContainer REQUIRED)

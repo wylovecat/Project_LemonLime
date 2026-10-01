@@ -80,6 +80,7 @@ class OnlineServerDialog : public QDialog {
 	QPushButton *applyWindowBtn_{};
 	QLabel *windowStatusLabel_{};
 	QCheckBox *autoJudgeBox_{};
+	QComboBox *pageStyleBox_{};
 
 	// Bottom status strip (always visible)
 	QLabel *stripStatusBadge_{};

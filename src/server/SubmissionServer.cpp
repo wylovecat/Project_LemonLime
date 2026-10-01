@@ -32,13 +32,6 @@ constexpr auto kStatementName = "statement.pdf";
 constexpr auto kAuditLogName = "online_submissions.log";
 constexpr auto kConfigName = "online_config.json";
 
-QString readResource(const QString &path) {
-	QFile f(path);
-	if (!f.open(QFile::ReadOnly))
-		return {};
-	return QString::fromUtf8(f.readAll());
-}
-
 QByteArray readResourceBytes(const QString &path) {
 	QFile f(path);
 	if (!f.open(QFile::ReadOnly))
@@ -124,6 +117,19 @@ void SubmissionServer::setAutoJudge(bool on) {
 	saveConfig();
 }
 
+void SubmissionServer::setPageStyle(const QString &style) {
+	const auto s = style.trimmed().toLower();
+	pageStyle_ = s.isEmpty() ? QStringLiteral("default") : s;
+	saveConfig();
+}
+
+void SubmissionServer::setSubmitMode(const QString &mode) {
+	submitMode_ = (mode.trimmed().compare(QStringLiteral("file"), Qt::CaseInsensitive) == 0)
+	                  ? QStringLiteral("file")
+	                  : QStringLiteral("paste");
+	saveConfig();
+}
+
 bool SubmissionServer::loadConfig() {
 	if (contestDir_.isEmpty())
 		return false;
@@ -137,6 +143,12 @@ bool SubmissionServer::loadConfig() {
 	startTime_ = QDateTime::fromString(obj.value("startTime").toString(), Qt::ISODate);
 	endTime_ = QDateTime::fromString(obj.value("endTime").toString(), Qt::ISODate);
 	autoJudge_ = obj.value("autoJudge").toBool(true);
+	const auto style = obj.value("pageStyle").toString().trimmed().toLower();
+	pageStyle_ = style.isEmpty() ? QStringLiteral("default") : style;
+	submitMode_ = (obj.value("submitMode").toString().trimmed().compare(QStringLiteral("file"),
+	                                                                   Qt::CaseInsensitive) == 0)
+	                  ? QStringLiteral("file")
+	                  : QStringLiteral("paste");
 	return true;
 }
 
@@ -151,6 +163,8 @@ bool SubmissionServer::saveConfig() const {
 	if (endTime_.isValid())
 		obj.insert("endTime", endTime_.toString(Qt::ISODate));
 	obj.insert("autoJudge", autoJudge_);
+	obj.insert("submitMode", submitMode_);
+	obj.insert("pageStyle", pageStyle_);
 	QSaveFile f(QDir(contestDir_).filePath(kConfigName));
 	if (!f.open(QFile::WriteOnly))
 		return false;
@@ -239,6 +253,11 @@ void SubmissionServer::setupRoutes() {
 		             return handleApiSubmit(taskId, req);
 	             });
 
+	http_->route("/api/source/<arg>", QHttpServerRequest::Method::Get,
+	             [this](qint32 taskId, const QHttpServerRequest &req) {
+		             return handleApiSource(taskId, req);
+	             });
+
 	http_->route("/statement", QHttpServerRequest::Method::Get,
 	             [this](const QHttpServerRequest &req) { return handleStatementPdf(req); });
 
@@ -302,11 +321,28 @@ QHttpServerResponse SubmissionServer::handleStatic(const QString &resourcePath, 
 	return resp;
 }
 
-QHttpServerResponse SubmissionServer::handleLoginPage() {
-	auto html = readResource(":/online/login.html");
-	if (html.isEmpty())
+// Resources are laid out as :/online/<pageStyle>/<page>.html with
+// :/online/default/<page>.html as the fallback for unknown/absent themes.
+QString SubmissionServer::pageResourcePath(const QString &name) const {
+	const auto themed = QStringLiteral(":/online/%1/%2.html").arg(pageStyle_, name);
+	if (QFile::exists(themed))
+		return themed;
+	return QStringLiteral(":/online/default/%1.html").arg(name);
+}
+
+QHttpServerResponse SubmissionServer::htmlPage(const QString &name) const {
+	const auto bytes = readResourceBytes(pageResourcePath(name));
+	if (bytes.isEmpty())
 		return QHttpServerResponse(QHttpServerResponder::StatusCode::InternalServerError);
-	return QHttpServerResponse("text/html; charset=utf-8", html.toUtf8());
+	QHttpServerResponse resp("text/html; charset=utf-8", bytes);
+	QHttpHeaders h = resp.headers();
+	h.append(QHttpHeaders::WellKnownHeader::CacheControl, "no-cache, must-revalidate");
+	resp.setHeaders(h);
+	return resp;
+}
+
+QHttpServerResponse SubmissionServer::handleLoginPage() {
+	return htmlPage(QStringLiteral("login"));
 }
 
 QHttpServerResponse SubmissionServer::handleLoginPost(const QHttpServerRequest &req) {
@@ -337,10 +373,7 @@ QHttpServerResponse SubmissionServer::handleIndex(const QHttpServerRequest &req)
 	QString user;
 	if (!requireSession(req, &user))
 		return redirect("/login");
-	auto html = readResource(":/online/index.html");
-	if (html.isEmpty())
-		return QHttpServerResponse(QHttpServerResponder::StatusCode::InternalServerError);
-	return QHttpServerResponse("text/html; charset=utf-8", html.toUtf8());
+	return htmlPage(QStringLiteral("index"));
 }
 
 QHttpServerResponse SubmissionServer::handleSubmitPage(qint32 taskId, const QHttpServerRequest &req) {
@@ -349,10 +382,7 @@ QHttpServerResponse SubmissionServer::handleSubmitPage(qint32 taskId, const QHtt
 		return redirect("/login");
 	if (!contest_ || taskId < 0 || taskId >= contest_->getTaskList().size())
 		return QHttpServerResponse(QHttpServerResponder::StatusCode::NotFound);
-	auto html = readResource(":/online/submit.html");
-	if (html.isEmpty())
-		return QHttpServerResponse(QHttpServerResponder::StatusCode::InternalServerError);
-	return QHttpServerResponse("text/html; charset=utf-8", html.toUtf8());
+	return htmlPage(QStringLiteral("submit"));
 }
 
 QHttpServerResponse SubmissionServer::handleApiTasks(const QHttpServerRequest &req) {
@@ -393,9 +423,12 @@ QHttpServerResponse SubmissionServer::handleApiTasks(const QHttpServerRequest &r
 	root.insert("displayName",
 	            userStore_ ? userStore_->displayNameOf(user) : QString());
 	root.insert("hasStatement", QFile::exists(QDir(contestDir_).filePath(kStatementName)));
+	root.insert("submitMode", submitMode_);
 	root.insert("tasks", arr);
 	root.insert("serverNow", QDateTime::currentDateTime().toString(Qt::ISODate));
 	root.insert("windowEnabled", windowEnabled_);
+	root.insert("preContest", windowEnabled_ && startTime_.isValid() &&
+	                              QDateTime::currentDateTime() < startTime_);
 	if (windowEnabled_ && startTime_.isValid())
 		root.insert("startTime", startTime_.toString(Qt::ISODate));
 	if (windowEnabled_ && endTime_.isValid())
@@ -485,6 +518,54 @@ QHttpServerResponse SubmissionServer::handleApiSubmit(qint32 taskId, const QHttp
 	    {"willJudge", willJudge},
 	};
 	return QHttpServerResponse("application/json", QJsonDocument(ok).toJson(QJsonDocument::Compact));
+}
+
+// GET /api/source/<taskId> — the student's most recent submission for a task,
+// used by the "查看" action on the task list. Answers 404 with 未找到提交记录
+// when that student has not handed in that task yet.
+QHttpServerResponse SubmissionServer::handleApiSource(qint32 taskId, const QHttpServerRequest &req) {
+	QString user;
+	if (!requireSession(req, &user))
+		return jsonError(401, tr("Not authenticated"));
+	if (!contest_)
+		return jsonError(500, tr("No contest bound"));
+
+	const auto taskList = contest_->getTaskList();
+	if (taskId < 0 || taskId >= taskList.size())
+		return jsonError(404, tr("Unknown task"));
+
+	const auto *task = taskList.at(taskId);
+	const auto srcDir = QDir(QDir(contestDir_).filePath(QStringLiteral("source/%1").arg(user)));
+	const auto base = task->getSourceFileName();
+	const QString folder = task->getSubFolderCheck() ? base + QChar('/') : QString();
+
+	QString bestPath;
+	QDateTime latest;
+	for (const auto *ext : {"cpp", "c", "py", "pas"}) {
+		const QFileInfo fi(srcDir, folder + base + QChar('.') + QString::fromLatin1(ext));
+		if (fi.exists() && (!latest.isValid() || fi.lastModified() > latest)) {
+			latest = fi.lastModified();
+			bestPath = fi.absoluteFilePath();
+		}
+	}
+	if (bestPath.isEmpty())
+		return jsonError(404, tr("未找到提交记录"));
+
+	QFile f(bestPath);
+	if (!f.open(QFile::ReadOnly))
+		return jsonError(500, f.errorString());
+	const auto bytes = f.readAll();
+
+	QJsonObject obj;
+	obj.insert("filename", srcDir.relativeFilePath(bestPath));
+	obj.insert("submittedAt", latest.toString(Qt::ISODate));
+	obj.insert("bytes", bytes.size());
+	obj.insert("content", QString::fromUtf8(bytes));
+	QHttpServerResponse resp("application/json", QJsonDocument(obj).toJson(QJsonDocument::Compact));
+	QHttpHeaders h = resp.headers();
+	h.append(QHttpHeaders::WellKnownHeader::CacheControl, "no-store");
+	resp.setHeaders(h);
+	return resp;
 }
 
 QHttpServerResponse SubmissionServer::handleStatementPdf(const QHttpServerRequest &req) {

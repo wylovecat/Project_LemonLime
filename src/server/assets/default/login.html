@@ -6,7 +6,7 @@
 <title>登录 · LemonLime 在线提交</title>
 <link rel="stylesheet" href="/assets/css/app.css" />
 </head>
-<body class="auth-body">
+<body class="auth-body" data-theme="default">
   <main class="auth-card" role="main">
     <h1 class="auth-title">LemonLime 在线提交</h1>
     <p class="auth-sub">请输入由老师下发的账号密码</p>
@@ -27,7 +27,6 @@
     <p class="auth-foot">系统不开放注册，账号请联系监考老师</p>
   </main>
   <script>
-    // toggle error if URL has ?err=1
     if (new URLSearchParams(location.search).has('err')) {
       const e = document.getElementById('err');
       if (e) e.hidden = false;

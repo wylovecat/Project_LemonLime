@@ -8,12 +8,18 @@
    下载: https://visualstudio.microsoft.com/zh-hans/downloads/
    安装时勾选 "使用 C++ 的桌面开发" 工作负载
 
-2. Qt 6.8 或更高版本（必须含 HttpServer 模块）
+2. Qt 6.8 或更高版本（必须含 HttpServer 模块，除非按【不含在线提交服务的编译方式】一节关掉它）
    下载: https://www.qt.io/download-qt-installer
    安装时勾选:
      - Qt 6.9.x → MSVC 2022 64-bit
      - Additional Libraries → Qt HTTP Server  ← 关键，默认不勾
    建议安装到默认路径: C:\Qt\
+
+   ⚠️ Windows 10 用户请注意 Qt 版本上限:
+     官方文档写明 Qt 6.12 是最后一个支持 Windows 10 的版本（要求 Win10 1809+），
+     Qt 6.13 起只支持 Windows 11。要给 Win10 机器发绿色版，
+     请用 Qt 6.8 ~ 6.12 构建（本次打包验证用的是 6.11.0）。
+     用 Qt 6.13+ 打的包在 Win10 上无法保证能启动。
 
 3. CMake
    下载: https://cmake.org/download/
@@ -60,20 +66,66 @@
 
 
 ============================================================
-【打包成可分发的绿色版（可选）】
+【打包成可分发的绿色版（推荐）】
 ============================================================
 
-在 build 目录里跑（cmd 单行）:
+在同一个 cmd 窗口里跑（一行）:
+
+   cmake --build build --target windows-portable
+
+会生成:
+
+   build\portable\lemon-<版本>-Windows-x64-portable\       ← 绿色版目录
+   build\portable\lemon-<版本>-Windows-x64-portable.zip     ← 直接分发的压缩包
+
+这个目录是真正自包含的，拷到任意 Win10 1809+ / Win11 机器双击即可运行:
+
+   * windeployqt 只放 vc_redist.x64.exe，不会拷 MSVC 运行库 dll，
+     打包脚本会自动从 Visual Studio 的 Redist 目录补齐 msvcp140.dll 等，
+     所以目标机器不需要预装 VC++ 运行库（脚本跑完会打印用的哪个目录）
+   * 目录里带一个 portable 标记文件: 设置写到 <目录>\LemonLime\lemon.ini，
+     日志写到 <目录>\logs，不污染注册表和用户目录（整个文件夹随便搬）
+   * 默认带上 opengl32sw.dll（软件 OpenGL），远程桌面/虚拟机/老显卡上更稳；
+     想省 20 MB 可以配置时加 -DLEMON_WINDOWS_PORTABLE_OPENGL_SW=OFF
+   * 不想让它打 zip: -DLEMON_WINDOWS_PORTABLE_ZIP=OFF
+
+可选: 把 MinGW-w64 一起打进去（体积会明显变大），配置时加
+
+   -DLEMON_WINDOWS_PORTABLE_BUNDLE_COMPILER=C:\mingw64
+
+打包后它在 compiler\mingw64\bin\g++.exe，程序启动时自动把这个目录
+加到 PATH，新建编译器时能自动填出 g++ 路径（也可以自己把 mingw64
+丢进绿色版目录的 compiler\ 下，效果一样）。
+
+如果要手工打包（不用 CMake 目标），等价命令是:
 
    set DEPLOY_DIR=C:\Users\你\Desktop\LemonLime-Online
    set QT_DIR=C:\Qt\6.9.3\msvc2022_64
    if exist "%DEPLOY_DIR%" rmdir /S /Q "%DEPLOY_DIR%"
    mkdir "%DEPLOY_DIR%"
    copy /Y lemon.exe "%DEPLOY_DIR%\"
-   "%QT_DIR%\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw "%DEPLOY_DIR%\lemon.exe"
+   "%QT_DIR%\bin\windeployqt.exe" --release "%DEPLOY_DIR%\lemon.exe"
+   copy "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Redist\MSVC\*\x64\Microsoft.VC143.CRT\msvcp140*.dll" "%DEPLOY_DIR%\"
+   copy "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Redist\MSVC\*\x64\Microsoft.VC143.CRT\vcruntime140*.dll" "%DEPLOY_DIR%\"
+   del "%DEPLOY_DIR%\vc_redist.x64.exe"
+   type nul > "%DEPLOY_DIR%\portable"
 
-跑完后整个 LemonLime-Online 文件夹拷到任意 Windows 机器都能直接运行
-（不需要装 Qt）。打 zip 分发约 30~50 MB。
+
+============================================================
+【不含在线提交服务的编译方式】
+============================================================
+
+如果装的 Qt 里没有 HTTP Server 模块（安装器默认不勾，很多预编译 Qt 也没有），
+又只想用 LemonLime 的评测/出题功能，可以在配置时关掉它:
+
+   cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release ^
+        -DCMAKE_PREFIX_PATH=C:\Qt\6.9.3\msvc2022_64 ^
+        -DENABLE_ONLINE_SERVER=OFF
+   ninja
+
+差异只有一个: 菜单 Tools → 在线提交服务 会被隐藏，其余功能完全一样。
+不开这个开关而 Qt 又缺 HttpServer 时，CMake 会直接报一段带修复建议的错误，
+不会只丢一句 "Could NOT find Qt6 (missing: HttpServer)"。
 
 
 ============================================================
@@ -84,6 +136,8 @@
 ║ Could NOT find Qt6 (missing: HttpServer)                ║
 ║   → Qt 安装时没勾 HTTP Server 模块                      ║
 ║   → 重跑 Qt 维护工具勾上                                ║
+║   → 或者不要在线提交服务: 配置时加                      ║
+║     -DENABLE_ONLINE_SERVER=OFF                          ║
 ╠══════════════════════════════════════════════════════════╣
 ║ cmake 不是内部或外部命令                                ║
 ║   → CMake 没装或没加 PATH                               ║
@@ -104,12 +158,21 @@
 ║ 评测时报 "Failed to create process"                     ║
 ║   不是 lemon 编译的问题，是 g++ 没配                    ║
 ║   1. 装 MinGW-w64 (winlibs.com 单 zip 最省事)           ║
-║   2. 把 C:\mingw64\bin 加到系统 PATH                    ║
+║   2. 把整个 mingw64 目录放进绿色版的 compiler\ 下       ║
+║      (即 compiler\mingw64\bin\g++.exe)，重启后自动识别 ║
+║      或者自己装，再把路径填到设置里                     ║
 ║   3. LemonLime → Tools → Settings → Compiler            ║
 ║      Compiler location 填绝对路径 C:\mingw64\bin\g++.exe║
 ║   4. 编译参数里加 -static 否则学生程序缺 libstdc++ dll  ║
 ║   5. 比赛目录加进 Windows Defender 排除项               ║
-║   详细错误码可以看日志: %LOCALAPPDATA%\Lemonlime\logs\  ║
+║   详细错误码可以看日志:                                 ║
+║     便携版 <绿色版目录>\logs\lemonlime-log.txt          ║
+║     普通安装 %LOCALAPPDATA%\Lemonlime\logs\             ║
+╠══════════════════════════════════════════════════════════╣
+║ 绿色版拷到别的机器报缺 msvcp140.dll / vcruntime140.dll  ║
+║   → 这个包是用 windeployqt 手工打的，没补 MSVC 运行库   ║
+║   → 用 cmake --build build --target windows-portable    ║
+║     重新打包，或在目标机器装一次 VC++ 2015-2022 运行库  ║
 ╚══════════════════════════════════════════════════════════╝
 
 

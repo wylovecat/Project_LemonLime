@@ -16,6 +16,7 @@
 #include <base/LemonBaseApplication.hpp>
 #include <base/LemonMacro.hpp>
 
+#include "spdlog/sinks/null_sink.h"
 #include "spdlog/spdlog.h"
 
 #define NEWLINE "\r\n"
@@ -47,7 +48,11 @@ enum LemonLogType { LEMON_LOG_WARN, LEMON_LOG_NORMAL, LEMON_LOG_DEBUG };
 Q_DECLARE_METATYPE(const char *)
 
 namespace Lemon::base {
-	inline std::shared_ptr<spdlog::logger> logger;
+	// A logger always exists: the constructor of LemonApplicationInterface logs
+	// before main() installs the real logger, and dereferencing a null logger
+	// crashed the startup. Messages logged in the meantime are discarded.
+	inline std::shared_ptr<spdlog::logger> logger =
+	    std::make_shared<spdlog::logger>("lemonlime", std::make_shared<spdlog::sinks::null_sink_mt>());
 
 	template <LemonLogType t, typename... T> inline void log_concat(T... v) {
 		QString tempBuffer;

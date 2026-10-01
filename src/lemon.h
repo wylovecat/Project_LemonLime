@@ -20,7 +20,9 @@ namespace Ui {
 class Contest;
 class Settings;
 class OptionsDialog;
+#ifdef LEMON_ONLINE_SERVER
 class OnlineServerDialog;
+#endif
 
 class LemonLime : public QMainWindow {
 	Q_OBJECT
@@ -37,7 +39,9 @@ class LemonLime : public QMainWindow {
 	Ui::LemonLime *ui;
 	Contest *curContest;
 	Settings *settings;
+#ifdef LEMON_ONLINE_SERVER
 	OnlineServerDialog *onlineServerDialog{};
+#endif
 	QFileSystemWatcher *dataDirWatcher;
 	QString curFile;
 	QSignalMapper *signalMapper;
@@ -60,7 +64,9 @@ class LemonLime : public QMainWindow {
 	void refreshSummary();
 	void resetDataWatcher();
 	void showOptionsDialog();
+#ifdef LEMON_ONLINE_SERVER
 	void showOnlineServerDialog();
+#endif
 	void refreshButtonClicked();
 	void cleanupButtonClicked();
 	void tabIndexChanged(int);

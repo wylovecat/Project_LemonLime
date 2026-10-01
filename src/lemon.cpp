@@ -14,6 +14,7 @@
 #include "addtaskdialog.h"
 #include "base/LemonBase.hpp"
 #include "base/LemonLog.hpp"
+#include "base/LemonPortable.hpp"
 #include "base/LemonTranslator.hpp"
 #include "base/compiler.h"
 #include "base/settings.h"
@@ -26,7 +27,9 @@
 #include "newcontestdialog.h"
 #include "opencontestdialog.h"
 #include "optionsdialog.h"
+#ifdef LEMON_ONLINE_SERVER
 #include "server/onlineserverdialog.h"
+#endif
 #include "statisticsbrowser.h"
 #include "welcomedialog.h"
 //
@@ -65,7 +68,12 @@ LemonLime::LemonLime(QWidget *parent) : QMainWindow(parent), ui(new Ui::LemonLim
 	connect(this, &LemonLime::dataPathChanged, ui->testCaseEdit, &TestCaseEditWidget::dataPathChanged);
 	connect(ui->summary, &SummaryTree::currentItemChanged, this, &LemonLime::summarySelectionChanged);
 	connect(ui->optionsAction, &QAction::triggered, this, &LemonLime::showOptionsDialog);
+#ifdef LEMON_ONLINE_SERVER
 	connect(ui->actionOnlineServer, &QAction::triggered, this, &LemonLime::showOnlineServerDialog);
+#else
+	// Built without Qt HttpServer: the online submission service is unavailable.
+	ui->actionOnlineServer->setVisible(false);
+#endif
 	connect(ui->cleanupButton, &QPushButton::clicked, this, &LemonLime::cleanupButtonClicked);
 	connect(ui->refreshButton, &QPushButton::clicked, this, &LemonLime::refreshButtonClicked);
 	connect(ui->judgeButton, &QPushButton::clicked, ui->resultViewer, &ResultViewer::judgeSelected);
@@ -97,7 +105,7 @@ LemonLime::LemonLime(QWidget *parent) : QMainWindow(parent), ui(new Ui::LemonLim
 	connect(ui->actionChangeContestName, &QAction::triggered, this, &LemonLime::changeContestName);
 	connect(ui->exitAction, &QAction::triggered, this, &LemonLime::close);
 
-	QSettings settings("LemonLime", "lemon");
+	QSettings settings = Lemon::Portable::settings();
 	QSize _size = settings.value("WindowSize", size()).toSize();
 	resize(_size);
 
@@ -123,16 +131,18 @@ void LemonLime::changeEvent(QEvent *event) {
 }
 
 void LemonLime::closeEvent(QCloseEvent * /*event*/) {
+#ifdef LEMON_ONLINE_SERVER
 	if (onlineServerDialog) {
 		onlineServerDialog->close();
 		delete onlineServerDialog;
 		onlineServerDialog = nullptr;
 	}
+#endif
 	if (curContest)
 		saveContest(curFile);
 
 	settings->saveSettings();
-	QSettings settings("LemonLime", "lemon");
+	QSettings settings = Lemon::Portable::settings();
 	settings.setValue("WindowSize", size());
 }
 
@@ -250,6 +260,7 @@ void LemonLime::showOptionsDialog() {
 	delete dialog;
 }
 
+#ifdef LEMON_ONLINE_SERVER
 void LemonLime::showOnlineServerDialog() {
 	if (! curContest) {
 		QMessageBox::information(
@@ -265,6 +276,7 @@ void LemonLime::showOnlineServerDialog() {
 	onlineServerDialog->raise();
 	onlineServerDialog->activateWindow();
 }
+#endif
 
 void LemonLime::judgeExtButtonFlip(bool stat) {
 	ui->judgeAllButton->setEnabled(stat);

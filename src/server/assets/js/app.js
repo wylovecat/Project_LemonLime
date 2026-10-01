@@ -40,27 +40,35 @@ function contestTimeState(data, offsetMs) {
   return { state: 'running', secs: 0 };
 }
 
-function renderCountdown(el, data, onTick) {
-  if (!el) return;
-  if (!data.windowEnabled) { el.hidden = true; return; }
-  el.hidden = false;
-  // freeze offset at first call
+// Accepts a single element or array of elements; updates each on every tick.
+function renderCountdown(target, data, onTick) {
+  const els = (Array.isArray(target) ? target : [target]).filter(Boolean);
+  if (!els.length) return;
+  if (!data.windowEnabled) { els.forEach(el => { el.hidden = true; }); return; }
+  els.forEach(el => { el.hidden = false; });
   const serverNow = data.serverNow ? new Date(data.serverNow).getTime() : Date.now();
   const offsetMs = serverNow - Date.now();
   function tick() {
     const s = contestTimeState(data, offsetMs);
-    el.classList.remove('is-pre', 'is-warning', 'is-danger', 'is-ended');
-    if (s.state === 'pre') {
-      el.classList.add('is-pre');
-      el.textContent = '距离开始 ' + fmtDuration(s.secs);
-    } else if (s.state === 'ended') {
-      el.classList.add('is-ended');
-      el.textContent = '比赛已结束';
-    } else {
-      if (s.secs <= 5 * 60) el.classList.add('is-danger');
-      else if (s.secs <= 30 * 60) el.classList.add('is-warning');
-      el.textContent = '剩余 ' + fmtDuration(s.secs);
-    }
+    let label;
+    if (s.state === 'pre')        label = '距离开始 ' + fmtDuration(s.secs);
+    else if (s.state === 'ended') label = '比赛已结束';
+    else                          label = '剩余 ' + fmtDuration(s.secs);
+    els.forEach(el => {
+      el.classList.remove('is-pre', 'is-warning', 'is-danger', 'is-ended');
+      if (s.state === 'pre')          el.classList.add('is-pre');
+      else if (s.state === 'ended')   el.classList.add('is-ended');
+      else if (s.secs <= 5 * 60)      el.classList.add('is-danger');
+      else if (s.secs <= 30 * 60)     el.classList.add('is-warning');
+      // for the bj inline text node, show only digits without prefix
+      if (el.id === 'bjCountdownText') {
+        el.textContent = (s.state === 'ended') ? '已结束' :
+                         (s.state === 'pre')   ? fmtDuration(s.secs) :
+                                                 fmtDuration(s.secs);
+      } else {
+        el.textContent = label;
+      }
+    });
     if (onTick) onTick(s);
   }
   tick();
@@ -76,21 +84,102 @@ function showToast(msg, isError) {
   setTimeout(() => { t.hidden = true; }, 2500);
 }
 
+// ---- Beijing theme helpers ----
+function bjClockTick() {
+  const el = document.getElementById('bjClock');
+  if (!el) return;
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  el.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+(function bootBjClock() {
+  if (document.body && document.body.dataset.theme === 'beijing') {
+    bjClockTick();
+    setInterval(bjClockTick, 1000);
+  } else {
+    // body might not be ready when script first runs; defer
+    document.addEventListener('DOMContentLoaded', () => {
+      if (document.body.dataset.theme === 'beijing') {
+        bjClockTick();
+        setInterval(bjClockTick, 1000);
+      }
+    });
+  }
+})();
+
+function bjPopulateUser(displayName) {
+  const u = document.getElementById('bjUser');
+  if (u) u.textContent = displayName || '—';
+}
+
+function bjUpdateStatementLink(hasStatement) {
+  const link = document.getElementById('bjStatementLink');
+  if (!link) return;
+  if (hasStatement) {
+    link.classList.remove('bj-sb-disabled');
+    link.removeAttribute('aria-disabled');
+  } else {
+    link.classList.add('bj-sb-disabled');
+    link.setAttribute('aria-disabled', 'true');
+    link.addEventListener('click', e => {
+      if (link.classList.contains('bj-sb-disabled')) e.preventDefault();
+    }, { once: true });
+  }
+}
+
+// notice modal — wired generically so it works on both index and submit
+document.addEventListener('click', e => {
+  const trigger = e.target.closest && e.target.closest('[data-bj-action="notice"]');
+  if (trigger) {
+    e.preventDefault();
+    const modal = document.getElementById('noticeModal');
+    if (modal) modal.classList.add('is-open');
+  }
+  const msgTrigger = e.target.closest && e.target.closest('[data-bj-action="messages"]');
+  if (msgTrigger) {
+    e.preventDefault();
+    showToast('暂无未读消息');
+  }
+});
+
 async function renderIndex() {
   try {
     const data = await fetchTasks();
     if (!data) return;
     document.getElementById('user').textContent = data.displayName || data.user;
     document.getElementById('contestTitle').textContent = data.contestTitle || '(未命名比赛)';
+    bjPopulateUser(data.displayName || data.user);
+    bjUpdateStatementLink(!!data.hasStatement);
     if (data.hasStatement) {
       const s = document.getElementById('statementLink');
       if (s) s.hidden = false;
     }
-    renderCountdown(document.getElementById('countdown'), data);
+    // beijing-theme inline countdown label
+    const bjLabel = document.getElementById('bjCountdownLabel');
+    if (bjLabel && data.windowEnabled) bjLabel.hidden = false;
+
+    // when contest starts, auto-reload so locked state lifts
+    let reloaded = false;
+    renderCountdown([
+      document.getElementById('countdown'),
+      document.getElementById('bjCountdownText'),
+    ], data, s => {
+      if (s.state === 'running' && data.preContest && !reloaded) {
+        reloaded = true; location.reload();
+      }
+    });
     const tbody = document.getElementById('taskBody');
     tbody.innerHTML = '';
+    if (data.preContest) {
+      tbody.innerHTML =
+        '<tr><td colspan="7" class="locked-cell">' +
+        '<div class="locked-title">比赛尚未开始</div>' +
+        '<div class="locked-sub">题目列表将在开始时间到达后自动出现，请耐心等待。</div>' +
+        '</td></tr>';
+      return;
+    }
     if (!data.tasks.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="muted">本场比赛尚无题目</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="muted">本场比赛尚无题目</td></tr>';
       return;
     }
     data.tasks.forEach((t, idx) => {
@@ -98,25 +187,104 @@ async function renderIndex() {
       tr.tabIndex = 0;
       tr.setAttribute('role', 'button');
       tr.setAttribute('aria-label', `进入题目 ${idx + 1} ${t.title}`);
-      tr.addEventListener('click', () => { location.href = '/submit/' + t.id; });
+      tr.addEventListener('click', e => {
+        if (e.target && e.target.closest('[data-view]')) return; // viewing, not navigating
+        location.href = '/submit/' + t.id;
+      });
       tr.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tr.click(); }
+        if (e.key === 'Enter' || e.key === ' ') {
+          if (e.target && e.target.closest('[data-view]')) return;
+          e.preventDefault(); tr.click();
+        }
       });
       const submitted = !!t.submittedAt;
+      const viewCell = submitted
+        ? `<a class="row-action" data-view="${t.id}">查看</a>`
+        : '<span class="muted">—</span>';
       tr.innerHTML = `
         <td class="num-col">${idx + 1}</td>
         <td>${escapeHtml(t.title)}</td>
         <td class="num-col">${t.totalScore}</td>
         <td><span class="status-pill ${submitted ? 'is-submitted' : ''}">${submitted ? '已提交' : '未提交'}</span></td>
         <td class="muted">${submitted ? fmtTime(t.submittedAt) : '—'}</td>
+        <td class="view-col">${viewCell}</td>
         <td class="action-col" aria-hidden="true">→</td>
       `;
       tbody.appendChild(tr);
+    });
+    // wire up the view links
+    tbody.querySelectorAll('[data-view]').forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault(); e.stopPropagation();
+        openCodeModal(parseInt(link.dataset.view, 10));
+      });
     });
   } catch (e) {
     showToast('加载失败：' + e.message, true);
   }
 }
+
+async function openCodeModal(taskId) {
+  const modal = document.getElementById('codeModal');
+  const titleEl = document.getElementById('codeModalTitle');
+  const filenameEl = document.getElementById('codeFilename');
+  const submittedEl = document.getElementById('codeSubmittedAt');
+  const bytesEl = document.getElementById('codeBytes');
+  const codeEl = document.getElementById('codeContent');
+  if (!modal) return;
+
+  titleEl.textContent = '查看提交代码';
+  filenameEl.textContent = '加载中…';
+  submittedEl.textContent = '—';
+  bytesEl.textContent = '—';
+  codeEl.textContent = '';
+  modal.classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const r = await fetch('/api/source/' + taskId, { credentials: 'same-origin' });
+    if (r.status === 401) { location.href = '/login'; return; }
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.error || ('HTTP ' + r.status));
+    }
+    const j = await r.json();
+    filenameEl.textContent = j.filename || '—';
+    submittedEl.textContent = fmtTime(j.submittedAt);
+    bytesEl.textContent = j.bytes;
+    codeEl.textContent = j.content || '';
+  } catch (e) {
+    codeEl.textContent = '';
+    filenameEl.textContent = '加载失败';
+    showToast('加载失败：' + e.message, true);
+  }
+}
+
+function closeAnyModal(target) {
+  const modals = target
+    ? [target.closest('.modal')].filter(Boolean)
+    : Array.from(document.querySelectorAll('.modal.is-open'));
+  modals.forEach(m => m.classList.remove('is-open'));
+  if (!document.querySelector('.modal.is-open'))
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('click', e => {
+  const closer = e.target.closest && e.target.closest('[data-modal-close]');
+  if (closer) closeAnyModal(closer);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeAnyModal();
+});
+document.addEventListener('click', e => {
+  if (e.target && e.target.id === 'codeCopyBtn') {
+    const text = document.getElementById('codeContent').textContent;
+    navigator.clipboard?.writeText(text).then(
+      () => showToast('已复制到剪贴板'),
+      err => showToast('复制失败：' + err.message, true)
+    );
+  }
+});
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c =>
@@ -131,14 +299,25 @@ async function renderSubmit() {
 
   const data = await fetchTasks();
   if (!data) return;
+  if (data.preContest) { location.href = '/'; return; }
   document.getElementById('user').textContent = data.displayName || data.user;
+  bjPopulateUser(data.displayName || data.user);
+  bjUpdateStatementLink(!!data.hasStatement);
   if (data.hasStatement) {
     const s = document.getElementById('statementLink');
     if (s) s.hidden = false;
   }
   // window state: gates the submit button if outside contest window
   let outsideWindow = false;
-  renderCountdown(document.getElementById('countdown'), data, s => {
+  // also unhide bj label if window enabled
+  if (data.windowEnabled) {
+    const lbl = document.getElementById('bjCountdownLabel');
+    if (lbl) lbl.hidden = false;
+  }
+  renderCountdown([
+    document.getElementById('countdown'),
+    document.getElementById('bjCountdownText'),
+  ], data, s => {
     outsideWindow = (s.state === 'pre' || s.state === 'ended');
     const btn = document.getElementById('submitBtn');
     if (outsideWindow) {
@@ -169,19 +348,98 @@ async function renderSubmit() {
   const saved = localStorage.getItem(draftKey);
   if (saved) editor.set(saved);
 
+  // ----- mode (paste vs file) — server-controlled -----
+  const mode = (data.submitMode === 'file') ? 'file' : 'paste';
+  let uploadedSource = '';
+  let uploadedName = '';
+  const extToLang = {
+    cpp: 'cpp', cc: 'cpp', cxx: 'cpp', cp: 'cpp',
+    c: 'c', h: 'cpp',
+    py: 'python',
+    pas: 'pascal', pp: 'pascal',
+  };
+
+  // Render only the chosen mode
+  document.getElementById('pasteMode').hidden = mode !== 'paste';
+  document.getElementById('fileMode').hidden = mode !== 'file';
+  document.getElementById('fontSizeField').style.display =
+      mode === 'paste' ? '' : 'none';
+
+  function getCurrentSource() {
+    return mode === 'paste' ? editor.get() : uploadedSource;
+  }
+
   function refreshCount() {
-    const v = editor.get();
+    const v = getCurrentSource();
     const bytes = new TextEncoder().encode(v).length;
     document.getElementById('charCount').textContent = bytes;
     const btn = document.getElementById('submitBtn');
-    if (outsideWindow) return; // countdown hook keeps it locked
+    if (outsideWindow) return;
     btn.disabled = bytes === 0 || bytes > charMax;
   }
   editor.onChange(v => {
     localStorage.setItem(draftKey, v);
-    refreshCount();
+    if (mode === 'paste') refreshCount();
   });
   refreshCount();
+
+  function pickLangFromExt(name) {
+    const m = (name || '').toLowerCase().match(/\.([^.]+)$/);
+    if (!m) return null;
+    return extToLang[m[1]] || null;
+  }
+
+  async function ingestFile(file) {
+    if (!file) return;
+    if (file.size === 0) {
+      showToast('文件为空', true);
+      return;
+    }
+    if (file.size > charMax) {
+      showToast('文件超过 ' + (charMax / 1024) + ' KB', true);
+      return;
+    }
+    let text;
+    try { text = await file.text(); }
+    catch (e) { showToast('读取文件失败：' + e.message, true); return; }
+    uploadedSource = text;
+    uploadedName = file.name;
+    document.getElementById('fileTitle').textContent = '已选择：' + file.name;
+    document.getElementById('fileSub').textContent =
+        file.size + ' 字节 · 点击或拖入可替换';
+    document.querySelector('#fileDrop').classList.add('has-file');
+    const guess = pickLangFromExt(file.name);
+    if (guess) document.getElementById('lang').value = guess;
+    refreshCount();
+  }
+
+  const fileInput = document.getElementById('fileInput');
+  document.getElementById('filePickBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    fileInput.click();
+  });
+  document.getElementById('fileDrop').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => {
+    if (e.target.files && e.target.files[0]) ingestFile(e.target.files[0]);
+  });
+
+  const drop = document.getElementById('fileDrop');
+  ['dragenter', 'dragover'].forEach(ev =>
+    drop.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.add('is-drag');
+    })
+  );
+  ['dragleave', 'drop'].forEach(ev =>
+    drop.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.remove('is-drag');
+    })
+  );
+  drop.addEventListener('drop', e => {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) ingestFile(f);
+  });
 
   document.getElementById('fontSize').addEventListener('change', e => {
     editor.setFontSize(parseInt(e.target.value, 10));
@@ -193,6 +451,11 @@ async function renderSubmit() {
   async function doSubmit() {
     const btn = document.getElementById('submitBtn');
     if (btn.disabled) return;
+    const source = getCurrentSource();
+    if (!source.trim()) {
+      showToast(mode === 'file' ? '请选择文件' : '请输入代码', true);
+      return;
+    }
     if (submitCount >= 1) {
       const ok = confirm(
         '这是第 ' + (submitCount + 1) + ' 次提交此题，' +
@@ -209,7 +472,7 @@ async function renderSubmit() {
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          source: editor.get(),
+          source: source,
           language: document.getElementById('lang').value,
         }),
       });

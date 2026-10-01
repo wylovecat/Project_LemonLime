@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>登录 · LemonLime 在线提交</title>
+<link rel="stylesheet" href="/assets/css/app.css" />
+</head>
+<body class="auth-body" data-theme="beijing">
+  <header class="bj-header">
+    <h1 class="bj-header-title">在线提交系统</h1>
+  </header>
+
+  <main class="auth-card" role="main">
+    <h1 class="auth-title">LemonLime 在线提交</h1>
+    <p class="auth-sub">请输入由老师下发的账号密码</p>
+    <form method="post" action="/login" autocomplete="off">
+      <label class="field">
+        <span class="field-label">用户名</span>
+        <input class="input" name="username" required autofocus
+               autocomplete="username" inputmode="latin" />
+      </label>
+      <label class="field">
+        <span class="field-label">密码</span>
+        <input class="input" name="password" type="password" required
+               autocomplete="current-password" />
+      </label>
+      <p id="err" class="error" hidden>用户名或密码不正确</p>
+      <button class="btn btn-primary btn-block" type="submit">
+        <span class="bj-login-arrow" aria-hidden="true">➜</span> 登录
+      </button>
+    </form>
+    <p class="auth-foot">系统不开放注册，账号请联系监考老师</p>
+  </main>
+
+  <aside class="bj-mosaic" aria-hidden="true">
+    <svg viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <rect x="0"   y="0"   width="200" height="200" fill="#1849A9"/>
+      <circle cx="100" cy="100" r="55" fill="none" stroke="#5BD0DA" stroke-width="14"/>
+      <ellipse cx="100" cy="100" rx="55" ry="14" fill="#5BD0DA"/>
+      <ellipse cx="100" cy="100" rx="55" ry="6" fill="#1849A9"/>
+      <rect x="200" y="0"   width="200" height="200" fill="#0E2F87"/>
+      <rect x="220" y="20"  width="60"  height="60"  fill="#5BD0DA"/>
+      <rect x="220" y="80"  width="60"  height="60"  fill="#1849A9"/>
+      <rect x="280" y="20"  width="60"  height="120" fill="#5BD0DA" opacity="0.45"/>
+      <rect x="220" y="140" width="160" height="40"  fill="#0E2F87" stroke="#5BD0DA" stroke-dasharray="4,4" stroke-width="2"/>
+      <rect x="400" y="0"   width="200" height="200" fill="#1E3FA8"/>
+      <path d="M400,200 L600,0 L600,200 Z" fill="#5BD0DA"/>
+      <circle cx="500" cy="100" r="48" fill="none" stroke="#0E2F87" stroke-width="20"/>
+      <rect x="0"   y="200" width="200" height="200" fill="#0E2F87"/>
+      <polygon points="0,200 200,200 0,400" fill="#F5C842"/>
+      <polygon points="120,260 200,400 40,400" fill="#1849A9"/>
+      <rect x="200" y="200" width="200" height="200" fill="#1E3FA8"/>
+      <rect x="200" y="240" width="80"  height="120" fill="#5BD0DA"/>
+      <rect x="280" y="200" width="120" height="80"  fill="#0E2F87"/>
+      <rect x="280" y="280" width="50"  height="50"  fill="#F5C842"/>
+      <rect x="400" y="200" width="200" height="200" fill="#1849A9"/>
+      <path d="M400,200 A100,100 0 0 1 600,200 L600,400 L400,400 Z"
+            fill="none" stroke="#F5C842" stroke-width="14"/>
+      <path d="M400,250 A150,150 0 0 1 550,400 L400,400 Z" fill="#5BD0DA"/>
+      <rect x="0"   y="400" width="200" height="200" fill="#1849A9"/>
+      <rect x="20"  y="430" width="80"  height="80"  fill="#5BD0DA" stroke="#0E2F87" stroke-dasharray="3,3" stroke-width="2"/>
+      <polygon points="100,540 160,580 40,580" fill="#F5C842"/>
+      <rect x="120" y="430" width="60"  height="60"  fill="#0E2F87"/>
+      <rect x="200" y="400" width="200" height="200" fill="#0E2F87"/>
+      <circle cx="300" cy="500" r="80" fill="none" stroke="#5BD0DA" stroke-width="14"/>
+      <path d="M260,500 L300,460 L340,500 L300,540 Z" fill="#1849A9"/>
+      <rect x="400" y="400" width="200" height="200" fill="#1E3FA8"/>
+      <polygon points="400,400 600,400 600,600" fill="#0E2F87"/>
+      <polygon points="600,400 600,600 400,600" fill="#5BD0DA" opacity="0.6"/>
+      <polygon points="500,420 540,500 460,500" fill="#F5C842"/>
+    </svg>
+  </aside>
+
+  <script>
+    if (new URLSearchParams(location.search).has('err')) {
+      const e = document.getElementById('err');
+      if (e) e.hidden = false;
+    }
+  </script>
+</body>
+</html>

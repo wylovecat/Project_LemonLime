@@ -6,7 +6,7 @@
 <title>题目列表 · LemonLime 在线提交</title>
 <link rel="stylesheet" href="/assets/css/app.css" />
 </head>
-<body>
+<body data-theme="default">
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="/">LemonLime 在线提交</a>
@@ -37,16 +37,36 @@
             <th class="num-col">分值</th>
             <th>状态</th>
             <th>最后提交时间</th>
+            <th class="view-col">查看</th>
             <th class="action-col" aria-label="操作"></th>
           </tr>
         </thead>
         <tbody id="taskBody">
-          <tr><td colspan="6" class="muted">加载中…</td></tr>
+          <tr><td colspan="7" class="muted">加载中…</td></tr>
         </tbody>
       </table>
     </section>
   </main>
 
+  <div id="codeModal" class="modal">
+    <div class="modal-overlay" data-modal-close="1"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="codeModalTitle">
+      <header class="modal-head">
+        <h2 id="codeModalTitle">查看提交代码</h2>
+        <button type="button" class="modal-close" data-modal-close="1" aria-label="关闭">×</button>
+      </header>
+      <div class="modal-meta">
+        <span class="meta-tag">文件 <b id="codeFilename">—</b></span>
+        <span class="meta-tag">提交于 <b id="codeSubmittedAt">—</b></span>
+        <span class="meta-tag"><b id="codeBytes">—</b> 字节</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-ghost" id="codeCopyBtn">复制</button>
+      </div>
+      <pre id="codeContent" class="modal-code"></pre>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
   <script src="/assets/js/app.js"></script>
   <script>renderIndex();</script>
 </body>

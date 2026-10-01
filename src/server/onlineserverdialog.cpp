@@ -33,6 +33,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRandomGenerator>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStyle>
 #include <QTabWidget>
@@ -305,6 +306,32 @@ QWidget *OnlineServerDialog::buildContestTab() {
 	judgeLayout->addWidget(hint);
 
 	layout->addWidget(judgeBox);
+
+	// --- Page theme
+	auto *themeBox = new QGroupBox(tr("学生端外观"), page);
+	auto *themeLayout = new QVBoxLayout(themeBox);
+	auto *themeRow = new QHBoxLayout();
+	themeRow->addWidget(new QLabel(tr("页面风格"), themeBox));
+	pageStyleBox_ = new QComboBox(themeBox);
+	pageStyleBox_->addItem(tr("默认（简洁版）"), QStringLiteral("default"));
+	pageStyleBox_->addItem(tr("北京活动风（深蓝渐变+几何）"), QStringLiteral("beijing"));
+	connect(pageStyleBox_, &QComboBox::currentIndexChanged, this, [this](int) {
+		if (!server_ || !pageStyleBox_)
+			return;
+		const auto style = pageStyleBox_->currentData().toString();
+		server_->setPageStyle(style);
+		appendLog(tr("学生端页面风格已切换为：%1").arg(pageStyleBox_->currentText()));
+	});
+	themeRow->addWidget(pageStyleBox_);
+	themeRow->addStretch();
+	themeLayout->addLayout(themeRow);
+	auto *themeHint = new QLabel(tr("决定学生打开的登录页、题目列表与提交页的外观，切换后需学生刷新页面。"),
+	                             themeBox);
+	themeHint->setStyleSheet(QStringLiteral("color: #94A3B8;"));
+	themeHint->setWordWrap(true);
+	themeLayout->addWidget(themeHint);
+
+	layout->addWidget(themeBox);
 	layout->addStretch(1);
 	return page;
 }
@@ -826,6 +853,13 @@ void OnlineServerDialog::refreshContestWindow() {
 		return;
 	if (autoJudgeBox_)
 		autoJudgeBox_->setChecked(server_->autoJudge());
+	if (pageStyleBox_) {
+		// setting the box must not feed back into saveConfig()
+		const QSignalBlocker blocker(pageStyleBox_);
+		const int idx = pageStyleBox_->findData(server_->pageStyle());
+		if (idx >= 0)
+			pageStyleBox_->setCurrentIndex(idx);
+	}
 	const auto en = server_->windowEnabled();
 	windowEnableBox_->setChecked(en);
 	startEdit_->setEnabled(en);

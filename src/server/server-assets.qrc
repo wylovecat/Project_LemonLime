@@ -1,8 +1,11 @@
 <RCC>
     <qresource prefix="/online">
-        <file alias="login.html">assets/login.html</file>
-        <file alias="index.html">assets/index.html</file>
-        <file alias="submit.html">assets/submit.html</file>
+        <file alias="default/login.html">assets/default/login.html</file>
+        <file alias="default/index.html">assets/default/index.html</file>
+        <file alias="default/submit.html">assets/default/submit.html</file>
+        <file alias="beijing/login.html">assets/beijing/login.html</file>
+        <file alias="beijing/index.html">assets/beijing/index.html</file>
+        <file alias="beijing/submit.html">assets/beijing/submit.html</file>
         <file alias="css/app.css">assets/css/app.css</file>
         <file alias="js/app.js">assets/js/app.js</file>
         <file alias="js/editor.js">assets/js/editor.js</file>

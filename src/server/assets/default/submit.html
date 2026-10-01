@@ -6,7 +6,7 @@
 <title>提交代码 · LemonLime 在线提交</title>
 <link rel="stylesheet" href="/assets/css/app.css" />
 </head>
-<body>
+<body data-theme="default">
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="/">← 返回题目列表</a>
@@ -42,7 +42,7 @@
             <option value="pascal">Pascal</option>
           </select>
         </label>
-        <label class="inline-field">
+        <label class="inline-field" id="fontSizeField">
           <span>字号</span>
           <select id="fontSize">
             <option>12</option><option selected>14</option><option>16</option><option>18</option>
@@ -52,15 +52,28 @@
         <span class="muted small" id="lastSubmitted"></span>
       </div>
 
-      <div class="editor-wrap">
-        <pre class="line-numbers" aria-hidden="true" id="ln">1</pre>
-        <textarea id="code" class="editor" spellcheck="false" autocomplete="off"
-                  autocorrect="off" autocapitalize="off"
-                  placeholder="在此粘贴或编写代码（Tab 缩进，Ctrl+Enter 提交）"></textarea>
+      <div id="pasteMode">
+        <div class="editor-wrap">
+          <pre class="line-numbers" aria-hidden="true" id="ln">1</pre>
+          <textarea id="code" class="editor" spellcheck="false" autocomplete="off"
+                    autocorrect="off" autocapitalize="off"
+                    placeholder="在此粘贴或编写代码（Tab 缩进，Ctrl+Enter 提交）"></textarea>
+        </div>
+      </div>
+
+      <div id="fileMode" class="file-zone" hidden>
+        <input id="fileInput" type="file" hidden
+               accept=".cpp,.cc,.cxx,.c,.py,.pas,.pp,.txt" />
+        <div class="file-zone-inner" id="fileDrop">
+          <div class="file-zone-icon" aria-hidden="true">↥</div>
+          <div class="file-zone-title" id="fileTitle">点击选择，或将代码文件拖到此处</div>
+          <div class="file-zone-sub" id="fileSub">支持 .cpp / .c / .py / .pas（≤ 64 KB）</div>
+          <button type="button" class="btn btn-ghost" id="filePickBtn">选择文件...</button>
+        </div>
       </div>
 
       <div class="editor-foot">
-        <span class="muted small">字符数 <span id="charCount">0</span> / <span id="charMax">65536</span></span>
+        <span class="muted small" id="sizeText">字节数 <span id="charCount">0</span> / <span id="charMax">65536</span></span>
         <span class="spacer"></span>
         <button class="btn btn-primary" id="submitBtn" type="button">提交代码</button>
       </div>

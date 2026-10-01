@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>题目列表 · LemonLime 在线提交</title>
+<link rel="stylesheet" href="/assets/css/app.css" />
+</head>
+<body data-theme="beijing">
+  <!-- ============== Beijing-theme: top bar ============== -->
+  <header class="bj-header">
+    <h1 class="bj-header-title">在线提交系统</h1>
+    <form method="post" action="/logout" class="bj-header-logout-form">
+      <button class="bj-logout-btn" type="submit">退出登录</button>
+    </form>
+  </header>
+
+  <!-- ============== Beijing-theme: left sidebar ============== -->
+  <aside class="bj-sidebar">
+    <div class="bj-sb-row bj-sb-clock">
+      <span class="bj-sb-icon" aria-hidden="true">🕒</span>
+      <span id="bjClock">--:--:--</span>
+    </div>
+    <div class="bj-sb-row bj-sb-user">
+      <span class="bj-sb-icon" aria-hidden="true">👤</span>
+      <span id="bjUser">…</span>
+    </div>
+    <nav class="bj-sb-menu">
+      <a class="bj-sb-item" href="#" data-bj-action="notice">
+        <span class="bj-sb-icon" aria-hidden="true">ⓘ</span> 考试须知
+      </a>
+      <a class="bj-sb-item" id="bjStatementLink" href="/statement" target="_blank" rel="noopener">
+        <span class="bj-sb-icon" aria-hidden="true">⬇</span> 试题下载
+      </a>
+      <a class="bj-sb-item is-active" href="/" aria-current="page">
+        <span class="bj-sb-icon" aria-hidden="true">✎</span> 答题
+      </a>
+      <a class="bj-sb-item bj-sb-disabled" href="#" data-bj-action="messages">
+        <span class="bj-sb-icon" aria-hidden="true">✉</span> <span id="bjMsgCount">0</span> 条未读消息
+      </a>
+    </nav>
+  </aside>
+
+  <!-- ============== Default-theme: top bar ============== -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">LemonLime 在线提交</a>
+      <span id="countdown" class="countdown" hidden></span>
+      <div class="topbar-right">
+        <a id="statementLink" class="btn btn-ghost" href="/statement" target="_blank" rel="noopener" hidden>题面下载</a>
+        <span class="user-chip">
+          欢迎，<b id="user">…</b>
+        </span>
+        <form method="post" action="/logout" class="inline">
+          <button class="btn btn-link" type="submit">退出</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============== shared main content ============== -->
+  <main class="container">
+    <!-- Beijing-theme: hexagonal decorative background -->
+    <div class="bj-deco" aria-hidden="true"></div>
+
+    <section class="contest-banner">
+      <h1 id="contestTitle" class="contest-title">…</h1>
+      <span id="bjCountdownLabel" class="bj-countdown-label" hidden>
+        考试剩余：<b id="bjCountdownText">--:--:--</b>
+      </span>
+    </section>
+
+    <section class="card bj-task-card">
+      <table class="task-table" id="taskTable">
+        <thead>
+          <tr>
+            <th class="num-col">序号</th>
+            <th>试题名称</th>
+            <th class="num-col">分值</th>
+            <th>状态</th>
+            <th>最后提交时间</th>
+            <th class="view-col">查看</th>
+            <th class="action-col" aria-label="操作"></th>
+          </tr>
+        </thead>
+        <tbody id="taskBody">
+          <tr><td colspan="7" class="muted">加载中…</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- View-code modal -->
+  <div id="codeModal" class="modal">
+    <div class="modal-overlay" data-modal-close="1"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="codeModalTitle">
+      <header class="modal-head">
+        <h2 id="codeModalTitle">查看提交代码</h2>
+        <button type="button" class="modal-close" data-modal-close="1" aria-label="关闭">×</button>
+      </header>
+      <div class="modal-meta">
+        <span class="meta-tag">文件 <b id="codeFilename">—</b></span>
+        <span class="meta-tag">提交于 <b id="codeSubmittedAt">—</b></span>
+        <span class="meta-tag"><b id="codeBytes">—</b> 字节</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-ghost" id="codeCopyBtn">复制</button>
+      </div>
+      <pre id="codeContent" class="modal-code"></pre>
+    </div>
+  </div>
+
+  <!-- 考试须知 modal (Beijing only, simple placeholder) -->
+  <div id="noticeModal" class="modal">
+    <div class="modal-overlay" data-modal-close="1"></div>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <header class="modal-head">
+        <h2>考试须知</h2>
+        <button type="button" class="modal-close" data-modal-close="1" aria-label="关闭">×</button>
+      </header>
+      <div class="modal-meta"><span class="muted">来自比赛主办方</span></div>
+      <div class="modal-notice">
+        <p>1. 请认真审题，独立完成提交。</p>
+        <p>2. 同一题多次提交，以最后一次为准。</p>
+        <p>3. 提交内容大小限制为 64 KB；超过会被拒绝。</p>
+        <p>4. 比赛时间窗口外不可提交，倒计时结束后系统自动锁定。</p>
+        <p>5. 如遇系统异常或网络问题，请立即联系监考老师。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/assets/js/app.js"></script>
+  <script>renderIndex();</script>
+</body>
+</html>

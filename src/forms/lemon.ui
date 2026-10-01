@@ -589,7 +589,7 @@
   <action name="actionOnlineServer">
    <property name="icon">
     <iconset resource="../../resource.qrc">
-     <normaloff>:/icon/globe.svg</normaloff>:/icon/globe.svg</iconset>
+     <normaloff>:/icon/globe.llsvg</normaloff>:/icon/globe.llsvg</iconset>
    </property>
    <property name="text">
     <string>在线提交服务...</string>

@@ -69,3 +69,9 @@ build-debug/
 .idea/
 cmake-build-debug/
 .vscode/
+# Local diagnostics and build outputs (not for the repository)
+.dbg/
+.ref/
+.acl-diagnosis/
+.submodule-backup/
+build-ok/

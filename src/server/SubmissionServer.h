@@ -46,6 +46,15 @@ class SubmissionServer : public QObject {
 	bool autoJudge() const { return autoJudge_; }
 	void setAutoJudge(bool on);
 
+	// Page theme served to students ("default" | "beijing"). Resolved against
+	// :/online/<pageStyle>/<page>.html with a fallback to :/online/default/.
+	QString pageStyle() const { return pageStyle_; }
+	void setPageStyle(const QString &style);
+
+	// How students hand in code: "paste" (built-in editor) or "file" (upload).
+	QString submitMode() const { return submitMode_; }
+	void setSubmitMode(const QString &mode);
+
 	bool loadConfig();
 	bool saveConfig() const;
 
@@ -57,6 +66,8 @@ class SubmissionServer : public QObject {
 
   private:
 	void setupRoutes();
+	QString pageResourcePath(const QString &name) const;
+	QHttpServerResponse htmlPage(const QString &name) const;
 	QHttpServerResponse handleStatic(const QString &resourcePath, const QString &contentType);
 	QHttpServerResponse handleLoginPage();
 	QHttpServerResponse handleLoginPost(const QHttpServerRequest &req);
@@ -65,6 +76,7 @@ class SubmissionServer : public QObject {
 	QHttpServerResponse handleSubmitPage(qint32 taskId, const QHttpServerRequest &req);
 	QHttpServerResponse handleApiTasks(const QHttpServerRequest &req);
 	QHttpServerResponse handleApiSubmit(qint32 taskId, const QHttpServerRequest &req);
+	QHttpServerResponse handleApiSource(qint32 taskId, const QHttpServerRequest &req);
 	QHttpServerResponse handleStatementPdf(const QHttpServerRequest &req);
 
 	QString sessionUser(const QHttpServerRequest &req) const;
@@ -92,4 +104,6 @@ class SubmissionServer : public QObject {
 	QDateTime endTime_;
 
 	bool autoJudge_ = true;
+	QString pageStyle_ = QStringLiteral("default");
+	QString submitMode_ = QStringLiteral("paste");
 };
