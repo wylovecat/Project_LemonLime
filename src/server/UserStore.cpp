@@ -65,8 +65,8 @@ bool UserStore::saveToContestDir(const QString &contestDir) const {
 		obj.insert("salt", QString::fromLatin1(u.salt.toBase64()));
 		obj.insert("hash", QString::fromLatin1(u.passwordHash.toBase64()));
 		obj.insert("iter", u.iterations);
-		if (!u.plaintext.isEmpty())
-			obj.insert("pw", u.plaintext);
+		// Plaintext passwords are never persisted: they live in memory only (for
+		// the CSV export) and in online_users_passwords.csv written on demand.
 		arr.append(obj);
 	}
 	QJsonObject root;
