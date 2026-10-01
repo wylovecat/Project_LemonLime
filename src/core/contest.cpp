@@ -232,6 +232,10 @@ void Contest::judge(const QList<std::pair<QString, QVector<int>>> &list) {
 	QVector<std::pair<Contestant *, int>> judgingTasks;
 	for (int i = 0; i < list.size(); i++) {
 		auto contestant = contestantList.value(list[i].first);
+		if (! contestant) {
+			WARN("Judging skipped for unknown contestant", list[i].first);
+			continue;
+		}
 		for (int j = 0; j < list[i].second.size(); j++)
 			judgingTasks.push_back({contestant, list[i].second[j]});
 	}
