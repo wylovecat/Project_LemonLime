@@ -636,8 +636,10 @@ bool SubmissionServer::writeSubmission(const QString &username, int taskIndex,
 void SubmissionServer::appendAuditLog(const QString &username, int taskIndex, qint64 bytes,
                                       const QString &sha256) {
 	QFile f(QDir(contestDir_).filePath(kAuditLogName));
-	if (!f.open(QFile::Append | QFile::Text))
+	if (!f.open(QFile::Append | QFile::Text)) {
+		emit logMessage(tr("Cannot write audit log: %1").arg(f.errorString()));
 		return;
+	}
 	const auto line =
 	    QStringLiteral("%1\t%2\ttask=%3\tbytes=%4\tsha256=%5\n")
 	        .arg(QDateTime::currentDateTime().toString(Qt::ISODateWithMs))
@@ -645,5 +647,7 @@ void SubmissionServer::appendAuditLog(const QString &username, int taskIndex, qi
 	        .arg(taskIndex)
 	        .arg(bytes)
 	        .arg(sha256);
-	f.write(line.toUtf8());
+	if (f.write(line.toUtf8()) != line.toUtf8().size())
+		emit logMessage(tr("Audit log write incomplete: %1").arg(f.errorString()));
+	f.flush();
 }
