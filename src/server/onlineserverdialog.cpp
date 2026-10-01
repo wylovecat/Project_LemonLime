@@ -541,6 +541,8 @@ void OnlineServerDialog::onAddUser() {
 void OnlineServerDialog::onRemoveUser() {
 	if (!server_ || contestDir_.isEmpty())
 		return;
+	if (!usersTable_ || !usersTable_->selectionModel())
+		return;
 	auto *store = server_->userStore();
 	if (!store)
 		return;
@@ -552,7 +554,10 @@ void OnlineServerDialog::onRemoveUser() {
 	    QMessageBox::Yes)
 		return;
 	for (const auto &idx : rows) {
-		const auto name = usersTable_->item(idx.row(), 0)->text();
+		auto *item = usersTable_->item(idx.row(), 0);
+		if (!item)
+			continue;
+		const auto name = item->text();
 		store->removeUser(name);
 	}
 	store->saveToContestDir(contestDir_);
@@ -763,6 +768,8 @@ void OnlineServerDialog::refreshUsersTable() {
 	auto *store = server_->userStore();
 	if (!store)
 		return;
+	if (!usersTable_)
+		return;
 	const auto names = store->allUsernames();
 	usersTable_->setRowCount(names.size());
 	for (int i = 0; i < names.size(); ++i) {
@@ -884,6 +891,8 @@ void OnlineServerDialog::refreshContestWindow() {
 }
 
 void OnlineServerDialog::refreshStatementHint() {
+	if (!statementLabel_)
+		return;
 	if (contestDir_.isEmpty()) {
 		statementLabel_->setText(tr("（尚未绑定比赛）"));
 		if (setStatementBtn_) setStatementBtn_->setEnabled(false);
@@ -902,6 +911,8 @@ void OnlineServerDialog::refreshStatementHint() {
 }
 
 void OnlineServerDialog::appendLog(const QString &msg) {
+	if (!logView_)
+		return;
 	logView_->appendPlainText(QDateTime::currentDateTime().toString("hh:mm:ss") + "  " + msg);
 }
 

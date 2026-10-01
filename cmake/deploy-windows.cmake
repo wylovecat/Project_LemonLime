@@ -23,6 +23,54 @@ if(NOT LEMON_WINDEPLOYQT)
     message(FATAL_ERROR "[lemon-portable] windeployqt is not available")
 endif()
 
+# ----------------------------------------------------------------------------------
+# 0b. Header dependency gate
+# ----------------------------------------------------------------------------------
+# Refuse to package a build tree that recorded no header dependencies: such a tree
+# links object files compiled against different header versions, which is exactly how
+# a portable package shipped with mismatched struct layouts and crashed (0xC0000374).
+if(NOT LEMON_BUILD_DIR OR NOT LEMON_MAKE_PROGRAM)
+    lemon_step("dependency check: skipped (no Ninja build tree given)")
+else()
+    execute_process(
+        COMMAND "${LEMON_MAKE_PROGRAM}" -C "${LEMON_BUILD_DIR}" -t deps
+        RESULT_VARIABLE _lemon_deps_status
+        OUTPUT_VARIABLE _lemon_deps_output
+        ERROR_QUIET)
+    if(NOT _lemon_deps_status EQUAL 0)
+        lemon_step("dependency check: skipped (ninja -t deps failed)")
+    else()
+        foreach(_lemon_deps_obj "lemon.cpp.obj" "onlineserverdialog.cpp.obj" "main.cpp.obj")
+            string(REGEX MATCH "${_lemon_deps_obj}: #deps ([0-9]+)," _lemon_deps_match "${_lemon_deps_output}")
+            if(NOT _lemon_deps_match)
+                lemon_step("dependency check: no database entry for ${_lemon_deps_obj}")
+            elseif(CMAKE_MATCH_1 EQUAL 0)
+                message(FATAL_ERROR
+                    "[lemon-portable] ${_lemon_deps_obj} recorded no header dependencies (#deps 0). "
+                    "This build tree mixes object files compiled against different header versions; "
+                    "delete it and configure/build again in a console where `chcp 65001` has been run "
+                    "(configure and build must share that console).")
+            else()
+                lemon_step("dependency check: ${_lemon_deps_obj} -> ${CMAKE_MATCH_1} headers")
+            endif()
+        endforeach()
+        string(REGEX MATCHALL ": #deps [0-9]+," _lemon_deps_all "${_lemon_deps_output}")
+        string(REGEX MATCHALL ": #deps 0," _lemon_deps_zero "${_lemon_deps_output}")
+        list(LENGTH _lemon_deps_all _lemon_deps_all_count)
+        list(LENGTH _lemon_deps_zero _lemon_deps_zero_count)
+        if(_lemon_deps_all_count GREATER 20 AND _lemon_deps_zero_count GREATER 0)
+            math(EXPR _lemon_deps_zero_percent "${_lemon_deps_zero_count} * 100 / ${_lemon_deps_all_count}")
+            lemon_step("dependency check: ${_lemon_deps_zero_count} of ${_lemon_deps_all_count} objects without header dependencies (${_lemon_deps_zero_percent}%)")
+            if(_lemon_deps_zero_percent GREATER 50)
+                message(FATAL_ERROR
+                    "[lemon-portable] ${_lemon_deps_zero_count} of ${_lemon_deps_all_count} object files "
+                    "recorded no header dependencies (${_lemon_deps_zero_percent}%): this build tree is "
+                    "not safe to package. Delete it and rebuild after `chcp 65001`.")
+            endif()
+        endif()
+    endif()
+endif()
+
 lemon_step("assembling ${LEMON_PACKAGE_NAME}")
 
 file(REMOVE_RECURSE "${LEMON_OUTPUT_DIR}")
