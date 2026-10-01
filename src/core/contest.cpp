@@ -171,44 +171,61 @@ void Contest::clearPath(const QString &curDir) {
 }
 
 void Contest::judge(const QVector<std::pair<Contestant *, int>> &judgingTasks) {
-	LOG("Start Judging");
-	stopJudging = false;
-	controller = new JudgingController(settings);
-
-	// connect(controller, &JudgingController::judgeFinished, this, &Contest::judgeFinished);
-	for (auto [contestant, i] : judgingTasks) {
-		TaskJudger *taskJudger = new TaskJudger();
-		connect(taskJudger, &TaskJudger::singleCaseFinished, this, &Contest::singleCaseFinished);
-		connect(taskJudger, &TaskJudger::compileError, this, &Contest::compileError);
-		connect(taskJudger, &TaskJudger::judgingStarted, this, &Contest::taskJudgingStarted);
-		connect(taskJudger, &TaskJudger::judgingFinished, this, &Contest::taskJudgingFinished);
-		taskJudger->setTask(taskList[i]);
-		taskJudger->setTaskId(i);
-		taskJudger->setSettings(settings);
-		taskJudger->setContestant(contestant);
-		controller->addTask(taskJudger);
-		/*
-		connect(thread, &AssignmentThread::dialogAlert, this, &Contest::dialogAlert);
-		connect(thread, &AssignmentThread::singleSubtaskDependenceFinished, this,
-		        &Contest::singleSubtaskDependenceFinished);
-		connect(this, &Contest::stopJudgingSignal, thread, &AssignmentThread::stopJudgingSlot);
-		*/
-		contestant->setJudgingTime(QDateTime::currentDateTime());
+	// A nested judge() call (e.g. an online-submission auto-judge arriving through
+	// the nested event loop of a running batch) must not overwrite `controller`.
+	// Queue it and drain after the current batch finishes.
+	if (judging) {
+		if (! judgingTasks.isEmpty())
+			pendingJudgeTasks.enqueue(judgingTasks);
+		return;
 	}
+	judging = true;
 
-	auto eventLoop = new QEventLoop();
-	connect(controller, &JudgingController::judgeFinished, eventLoop, &QEventLoop::quit,
-	        Qt::QueuedConnection);
+	auto batch = judgingTasks;
+	while (! batch.isEmpty()) {
+		LOG("Start Judging");
+		stopJudging = false;
+		controller = new JudgingController(settings);
 
-	controller->start();
+		// connect(controller, &JudgingController::judgeFinished, this, &Contest::judgeFinished);
+		for (auto [contestant, i] : batch) {
+			TaskJudger *taskJudger = new TaskJudger();
+			connect(taskJudger, &TaskJudger::singleCaseFinished, this, &Contest::singleCaseFinished);
+			connect(taskJudger, &TaskJudger::compileError, this, &Contest::compileError);
+			connect(taskJudger, &TaskJudger::judgingStarted, this, &Contest::taskJudgingStarted);
+			connect(taskJudger, &TaskJudger::judgingFinished, this, &Contest::taskJudgingFinished);
+			taskJudger->setTask(taskList[i]);
+			taskJudger->setTaskId(i);
+			taskJudger->setSettings(settings);
+			taskJudger->setContestant(contestant);
+			controller->addTask(taskJudger);
+			/*
+			connect(thread, &AssignmentThread::dialogAlert, this, &Contest::dialogAlert);
+			connect(thread, &AssignmentThread::singleSubtaskDependenceFinished, this,
+			        &Contest::singleSubtaskDependenceFinished);
+			connect(this, &Contest::stopJudgingSignal, thread, &AssignmentThread::stopJudgingSlot);
+			*/
+			contestant->setJudgingTime(QDateTime::currentDateTime());
+		}
 
-	eventLoop->exec();
+		auto eventLoop = new QEventLoop();
+		connect(controller, &JudgingController::judgeFinished, eventLoop, &QEventLoop::quit,
+		        Qt::QueuedConnection);
 
-	delete eventLoop;
-	delete controller;
-	controller = nullptr;
-	std::atomic_thread_fence(std::memory_order_seq_cst);
-	LOG("Judging Finished");
+		controller->start();
+
+		eventLoop->exec();
+
+		delete eventLoop;
+		delete controller;
+		controller = nullptr;
+		std::atomic_thread_fence(std::memory_order_seq_cst);
+		LOG("Judging Finished");
+
+		batch = pendingJudgeTasks.isEmpty() ? QVector<std::pair<Contestant *, int>>()
+		                                    : pendingJudgeTasks.dequeue();
+	}
+	judging = false;
 }
 
 void Contest::judge(const QList<std::pair<QString, QVector<int>>> &list) {
@@ -233,7 +250,8 @@ void Contest::judgeAll() {
 
 void Contest::stopJudgingSlot() {
 	stopJudging = true;
-	QMetaObject::invokeMethod(controller, "stop");
+	if (controller)
+		QMetaObject::invokeMethod(controller, "stop");
 }
 
 void Contest::writeToJson(QJsonObject &out) {

@@ -13,6 +13,7 @@
 #include "base/LemonType.hpp"
 
 #include <QJsonObject>
+#include <QQueue>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -56,7 +57,9 @@ class Contest : public QObject {
 	void judge(Contestant *);
 	void judge(const QVector<std::pair<Contestant *, int>> &);
 	void clearPath(const QString &);
-	JudgingController *controller;
+	JudgingController *controller{};
+	bool judging{};
+	QQueue<QVector<std::pair<Contestant *, int>>> pendingJudgeTasks;
 
   public slots:
 	void judge(const QList<std::pair<QString, QVector<int>>> &);
