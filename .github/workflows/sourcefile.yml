@@ -5,6 +5,11 @@ on:
   release:
     types: [published, edited]
 
+# The tag build uploads the source archive to the release via GITHUB_TOKEN; the
+# repository default is a read-only token, so ask for write access explicitly.
+permissions:
+  contents: write
+
 jobs:
   linux:
     name: All Source Files
