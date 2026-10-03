@@ -1,0 +1,72 @@
+name: Linux Qt6
+
+on:
+  # push代码时触发workflow
+  push:
+    # 忽略README.md
+    paths-ignore:
+      - "README.md"
+      - "LICENSE"
+      - "BUILD.md"
+  # pull_request时触发workflow
+  pull_request:
+    # 忽略README.md
+    paths-ignore:
+      - "README.md"
+      - "LICENSE"
+      - "BUILD.md"
+
+# Coverage-only job: it uploads no artifacts, so it does not run on releases.
+#
+# The linux-static-qt6 workflow has to build with -DENABLE_ONLINE_SERVER=OFF
+# because its static Qt is compiled without the HttpServer module. This job
+# uses the shared Qt build from the online installer instead, so the embedded
+# online submission service is compiled and its server-smoke test actually
+# runs on Linux.
+jobs:
+  build:
+    name: Linux ${{ matrix.build_type }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Release, Debug]
+    steps:
+      - name: Checking out sources
+        uses: actions/checkout@v6
+        with:
+          submodules: "recursive"
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build cmake pkgconf \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libfontconfig1-dev libfreetype6-dev libdbus-1-dev \
+            libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev libxi-dev libxrender-dev \
+            libxcb1-dev libxcb-glx0-dev libxcb-keysyms1-dev libxcb-image0-dev \
+            libxcb-shm0-dev libxcb-icccm4-dev libxcb-sync-dev libxcb-xfixes0-dev \
+            libxcb-shape0-dev libxcb-randr0-dev libxcb-render-util0-dev \
+            libxcb-xinerama0-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libharfbuzz-dev libsm-dev libdrm-dev
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.9.3"
+          host: linux
+          arch: linux_gcc_64
+          cache: true
+          # The online submission service is on by default (ENABLE_ONLINE_SERVER)
+          # and refuses to configure without Qt6::HttpServer. Both modules are
+          # "additional libraries" that the default Qt install omits.
+          modules: "qthttpserver qtwebsockets"
+      - name: Build
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DLEMON_BUILD_INFO="Build for Linux" \
+            -DLEMON_BUILD_EXTRA_INFO="Build on $(uname -sr)"
+          cmake --build build --parallel $(nproc)
+      - name: Run tests
+        run: |
+          ctest --test-dir build --output-on-failure --timeout 120

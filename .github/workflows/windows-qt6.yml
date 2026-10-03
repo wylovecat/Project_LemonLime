@@ -62,7 +62,11 @@ jobs:
           arch: ${{ matrix.qtarch }}
           cache: true
           setup-python: "false"
-          modules: "qtactiveqt"
+          # qtactiveqt: AxContainer for ENABLE_XLS_EXPORT.
+          # qthttpserver/qtwebsockets: the embedded online submission service
+          # (ENABLE_ONLINE_SERVER=ON by default, which is a hard configure error
+          # when Qt6::HttpServer is missing) and its server-smoke test.
+          modules: "qtactiveqt qthttpserver qtwebsockets"
 
       - name: Win-x64 - ${{ matrix.qt_version }} - Generate Dependencies and Build
         shell: bash
@@ -79,7 +83,9 @@ jobs:
           cmake --build . --parallel $(nproc)
       - name: Deploy Qt for tests
         shell: pwsh
-        run: windeployqt tests\test1\test1.exe
+        run: |
+          windeployqt tests\test1\test1.exe
+          windeployqt tests\server-smoke\server-smoke.exe
       - name: Run tests
         shell: bash
         env:

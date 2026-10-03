@@ -78,6 +78,8 @@ jobs:
           cd build
           # qt-6.9-static-linux.tar.gz is built without the Qt HttpServer module,
           # so the embedded online submission service cannot be compiled in.
+          # The online server is compiled and tested by the shared-Qt Linux job
+          # in linux-qt6.yml; this static build intentionally ships without it.
           cmake ../Project_LemonLime -GNinja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DENABLE_ONLINE_SERVER=OFF -DLEMON_BUILD_INFO="Build for Linux" -DLEMON_BUILD_EXTRA_INFO="Build on $(uname -sr)" -DCMAKE_PREFIX_PATH=../qt6/bin
           cmake --build . --parallel $(nproc)
       - name: Run tests
