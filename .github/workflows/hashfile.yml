@@ -3,41 +3,62 @@ name: Update release files hash
 on:
   release:
     types: [edited]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to hash (for example 0.3.7)
+        required: true
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - run: echo "VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
+      - name: Resolve version
         shell: bash
-      - run: echo "REPOSITORY_NAME=$(echo \"$GITHUB_REPOSITORY\" | awk -F / '{print $2}')" >> $GITHUB_ENV
-        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ inputs.tag }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
       - name: Checking out sources
         uses: actions/checkout@v6
         with:
           ref: master
       - name: Hash File
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          wget -O release.info https://api.github.com/repos/iotang/${REPOSITORY_NAME}/releases/tags/${VERSION}
-          cat ./release.info | jq -r ".assets | .[] | .browser_download_url" > download.list
-          cat ./release.info | jq -r ".assets | .[] | { uploader_id: .uploader.login, asset_name: .name }" > assets.info.json
-          mkdir files
+          set -euo pipefail
+          wget -q -O release.info \
+            --header="Authorization: Bearer ${GH_TOKEN}" \
+            --header="Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${VERSION}"
+          jq -r ".assets | .[] | .browser_download_url" release.info > download.list
+          jq -r ".assets | .[] | { uploader_id: .uploader.login, asset_name: .name }" release.info > assets.info.json
+          mkdir -p files
           cd files
-          for x in $(cat ../download.list); do
-             wget "$x";
-          done;
-          rm assets.info.json || true
-          rm sha256.list || true
+          while IFS= read -r url; do
+            if [ -n "$url" ]; then wget -q "$url"; fi
+          done < ../download.list
+          # the metadata files themselves are not part of the checksum list
+          rm -f assets.info.json sha256.list
           sha256sum ./* > ../sha256.list
+          cd ..
+          cat sha256.list
       - name: Upload metadata to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: assets.info.json
           asset_name: assets.info.json
-          tag: ${{ github.ref }}
+          tag: ${{ env.VERSION }}
           overwrite: true
       - name: Upload metadata to release
         uses: svenstaro/upload-release-action@v2
@@ -45,5 +66,5 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: sha256.list
           asset_name: sha256.list
-          tag: ${{ github.ref }}
+          tag: ${{ env.VERSION }}
           overwrite: true
