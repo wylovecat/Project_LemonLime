@@ -16,6 +16,12 @@ on:
       - "BUILD.md"
   release:
     types: [published]
+
+# The release job uploads the packaged zip to the tag via GITHUB_TOKEN; the
+# repository default is a read-only token, so ask for write access explicitly.
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build
