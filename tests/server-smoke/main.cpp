@@ -54,8 +54,7 @@ class TestServerSmoke : public QObject {
 	HttpResult http(const QString &method, const QString &path, const QByteArray &contentType = {},
 	                const QByteArray &body = {}, const QString &cookie = {}) {
 		QNetworkRequest req(QUrl(QStringLiteral("http://127.0.0.1:%1%2").arg(port_).arg(path)));
-		req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-		                 QNetworkRequest::ManualRedirectPolicy);
+		req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
 		const auto &activeCookie = cookie.isEmpty() ? cookie_ : cookie;
 		if (! activeCookie.isEmpty())
 			req.setRawHeader("Cookie", activeCookie.toUtf8());
@@ -87,10 +86,9 @@ class TestServerSmoke : public QObject {
 	}
 
 	QString loginAndGetCookie(const QString &user, const QString &password) {
-		const auto body =
-		    QStringLiteral("username=%1&password=%2").arg(user, password).toUtf8();
-		const auto r = http(QStringLiteral("POST"), QStringLiteral("/login"),
-		                    "application/x-www-form-urlencoded", body);
+		const auto body = QStringLiteral("username=%1&password=%2").arg(user, password).toUtf8();
+		const auto r =
+		    http(QStringLiteral("POST"), QStringLiteral("/login"), "application/x-www-form-urlencoded", body);
 		if (r.status != 303)
 			return {};
 		// Set-Cookie: lemon_sid=<token>; Path=/; HttpOnly; SameSite=Lax
@@ -204,10 +202,9 @@ void TestServerSmoke::testPlaintextRecoveredFromCsvAfterReload() {
 }
 
 void TestServerSmoke::testLoginRejectsBadPassword() {
-	const auto body =
-	    QStringLiteral("username=stu01&password=definitely-wrong").toUtf8();
-	const auto r = http(QStringLiteral("POST"), QStringLiteral("/login"),
-	                    "application/x-www-form-urlencoded", body);
+	const auto body = QStringLiteral("username=stu01&password=definitely-wrong").toUtf8();
+	const auto r =
+	    http(QStringLiteral("POST"), QStringLiteral("/login"), "application/x-www-form-urlencoded", body);
 	QCOMPARE(r.status, 303);
 	QVERIFY(QUrl(QString::fromUtf8(r.location)).path() == QStringLiteral("/login"));
 	// and a request without a session must not see the task list
@@ -224,14 +221,12 @@ void TestServerSmoke::testSubmitWritesSourceFile() {
 	const auto body = QJsonDocument(QJsonObject{{QStringLiteral("source"), QString::fromUtf8(code)},
 	                                            {QStringLiteral("language"), QStringLiteral("cpp")}})
 	                      .toJson(QJsonDocument::Compact);
-	const auto r =
-	    http(QStringLiteral("POST"), QStringLiteral("/api/submit/0"), "application/json", body);
+	const auto r = http(QStringLiteral("POST"), QStringLiteral("/api/submit/0"), "application/json", body);
 	QCOMPARE(r.status, 200);
 	const auto reply = QJsonDocument::fromJson(r.body).object();
 	QCOMPARE(reply.value(QStringLiteral("ok")).toBool(), true);
 
-	const QString path =
-	    contestDir_.filePath(QStringLiteral("source/stu01/answer.cpp"));
+	const QString path = contestDir_.filePath(QStringLiteral("source/stu01/answer.cpp"));
 	QVERIFY2(QFile::exists(path), qPrintable(QStringLiteral("missing %1").arg(path)));
 	QFile f(path);
 	QVERIFY(f.open(QFile::ReadOnly));
@@ -243,8 +238,7 @@ void TestServerSmoke::testResubmissionOverwrites() {
 	const auto body = QJsonDocument(QJsonObject{{QStringLiteral("source"), QString::fromUtf8(second)},
 	                                            {QStringLiteral("language"), QStringLiteral("cpp")}})
 	                      .toJson(QJsonDocument::Compact);
-	const auto r =
-	    http(QStringLiteral("POST"), QStringLiteral("/api/submit/0"), "application/json", body);
+	const auto r = http(QStringLiteral("POST"), QStringLiteral("/api/submit/0"), "application/json", body);
 	QCOMPARE(r.status, 200);
 
 	QFile f(contestDir_.filePath(QStringLiteral("source/stu01/answer.cpp")));
@@ -272,12 +266,11 @@ void TestServerSmoke::testAuditLogWritten() {
 void TestServerSmoke::testAutoJudgeSurvivesRapidSubmissions() {
 	server_->setAutoJudge(true);
 	const auto submit = [this](const char *code, const QString &cookie) {
-		const auto body =
-		    QJsonDocument(QJsonObject{{QStringLiteral("source"), QLatin1String(code)},
-		                              {QStringLiteral("language"), QStringLiteral("cpp")}})
-		        .toJson(QJsonDocument::Compact);
-		return http(QStringLiteral("POST"), QStringLiteral("/api/submit/0"),
-		            "application/json", body, cookie);
+		const auto body = QJsonDocument(QJsonObject{{QStringLiteral("source"), QLatin1String(code)},
+		                                            {QStringLiteral("language"), QStringLiteral("cpp")}})
+		                      .toJson(QJsonDocument::Compact);
+		return http(QStringLiteral("POST"), QStringLiteral("/api/submit/0"), "application/json", body,
+		            cookie);
 	};
 	const auto cookie2 = loginAndGetCookie(QStringLiteral("stu02"), password2_);
 	QVERIFY(cookie2.startsWith(QStringLiteral("lemon_sid=")));

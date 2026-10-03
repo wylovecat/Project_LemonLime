@@ -13,8 +13,8 @@
 #include "base/LemonType.hpp"
 
 #include <QJsonObject>
-#include <QQueue>
 #include <QObject>
+#include <QQueue>
 #include <QString>
 #include <QStringList>
 

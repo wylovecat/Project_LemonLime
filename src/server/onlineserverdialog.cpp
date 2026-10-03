@@ -14,6 +14,7 @@
 #include <QClipboard>
 #include <QComboBox>
 #include <QDateTimeEdit>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
@@ -29,7 +30,6 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QNetworkInterface>
-#include <QDesktopServices>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRandomGenerator>
@@ -37,10 +37,10 @@
 #include <QSpinBox>
 #include <QStyle>
 #include <QTabWidget>
-#include <QToolButton>
-#include <QUrl>
 #include <QTableWidget>
 #include <QTextStream>
+#include <QToolButton>
+#include <QUrl>
 #include <QVBoxLayout>
 
 OnlineServerDialog::OnlineServerDialog(QWidget *parent) : QDialog(parent) {
@@ -66,45 +66,44 @@ void OnlineServerDialog::bindContest(Contest *contest, const QString &contestDir
 }
 
 void OnlineServerDialog::buildUi() {
-	setStyleSheet(QStringLiteral(
-	    "QGroupBox { border: 1px solid #E5E7EB; border-radius: 6px; "
-	    "  margin-top: 12px; padding: 10px 12px 8px 12px; }"
-	    "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; "
-	    "  color: #475569; font-weight: 600; }"
-	    "QPushButton { padding: 6px 14px; border: 1px solid #D4D4D8; "
-	    "  border-radius: 6px; background: #FFFFFF; }"
-	    "QPushButton:hover { background: #F4F4F5; }"
-	    "QPushButton:disabled { color: #A1A1AA; background: #FAFAFA; }"
-	    "QPushButton#PrimaryBtn { background: #84CC16; color: #1A2E05; "
-	    "  border: 1px solid #65A30D; font-weight: 600; }"
-	    "QPushButton#PrimaryBtn:hover { background: #65A30D; color: #FFFFFF; }"
-	    "QPushButton#StopBtn { background: #FEE2E2; color: #991B1B; "
-	    "  border: 1px solid #FCA5A5; font-weight: 600; }"
-	    "QPushButton#StopBtn:hover { background: #FECACA; }"
-	    "QTabWidget::pane { border: 1px solid #E5E7EB; border-radius: 6px; "
-	    "  background: #FFFFFF; top: -1px; }"
-	    "QTabBar::tab { padding: 8px 18px; margin-right: 2px; "
-	    "  border: 1px solid transparent; border-bottom: 0; "
-	    "  border-top-left-radius: 6px; border-top-right-radius: 6px; "
-	    "  color: #64748B; }"
-	    "QTabBar::tab:selected { background: #FFFFFF; color: #0F172A; "
-	    "  border-color: #E5E7EB; font-weight: 600; }"
-	    "QTabBar::tab:!selected:hover { color: #0F172A; }"
-	    "QLineEdit, QComboBox, QSpinBox, QDateTimeEdit { "
-	    "  padding: 5px 8px; border: 1px solid #D4D4D8; border-radius: 4px; "
-	    "  background: #FFFFFF; }"
-	    "QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDateTimeEdit:focus { "
-	    "  border-color: #84CC16; }"
-	    "QTableWidget { border: 1px solid #E5E7EB; border-radius: 4px; "
-	    "  gridline-color: #F1F5F9; background: #FFFFFF; }"
-	    "QHeaderView::section { background: #F8FAFC; padding: 6px; "
-	    "  border: 0; border-bottom: 1px solid #E5E7EB; color: #475569; }"
-	    "QPlainTextEdit { border: 1px solid #E5E7EB; border-radius: 4px; "
-	    "  background: #FAFAFA; font-family: Menlo, Consolas, monospace; }"
-	    "QLabel#StatusBadge { padding: 3px 10px; border-radius: 999px; "
-	    "  background: #F1F5F9; color: #64748B; font-weight: 600; }"
-	    "QLabel#StatusBadgeRunning { padding: 3px 10px; border-radius: 999px; "
-	    "  background: #DCFCE7; color: #15803D; font-weight: 600; }"));
+	setStyleSheet(QStringLiteral("QGroupBox { border: 1px solid #E5E7EB; border-radius: 6px; "
+	                             "  margin-top: 12px; padding: 10px 12px 8px 12px; }"
+	                             "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; "
+	                             "  color: #475569; font-weight: 600; }"
+	                             "QPushButton { padding: 6px 14px; border: 1px solid #D4D4D8; "
+	                             "  border-radius: 6px; background: #FFFFFF; }"
+	                             "QPushButton:hover { background: #F4F4F5; }"
+	                             "QPushButton:disabled { color: #A1A1AA; background: #FAFAFA; }"
+	                             "QPushButton#PrimaryBtn { background: #84CC16; color: #1A2E05; "
+	                             "  border: 1px solid #65A30D; font-weight: 600; }"
+	                             "QPushButton#PrimaryBtn:hover { background: #65A30D; color: #FFFFFF; }"
+	                             "QPushButton#StopBtn { background: #FEE2E2; color: #991B1B; "
+	                             "  border: 1px solid #FCA5A5; font-weight: 600; }"
+	                             "QPushButton#StopBtn:hover { background: #FECACA; }"
+	                             "QTabWidget::pane { border: 1px solid #E5E7EB; border-radius: 6px; "
+	                             "  background: #FFFFFF; top: -1px; }"
+	                             "QTabBar::tab { padding: 8px 18px; margin-right: 2px; "
+	                             "  border: 1px solid transparent; border-bottom: 0; "
+	                             "  border-top-left-radius: 6px; border-top-right-radius: 6px; "
+	                             "  color: #64748B; }"
+	                             "QTabBar::tab:selected { background: #FFFFFF; color: #0F172A; "
+	                             "  border-color: #E5E7EB; font-weight: 600; }"
+	                             "QTabBar::tab:!selected:hover { color: #0F172A; }"
+	                             "QLineEdit, QComboBox, QSpinBox, QDateTimeEdit { "
+	                             "  padding: 5px 8px; border: 1px solid #D4D4D8; border-radius: 4px; "
+	                             "  background: #FFFFFF; }"
+	                             "QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDateTimeEdit:focus { "
+	                             "  border-color: #84CC16; }"
+	                             "QTableWidget { border: 1px solid #E5E7EB; border-radius: 4px; "
+	                             "  gridline-color: #F1F5F9; background: #FFFFFF; }"
+	                             "QHeaderView::section { background: #F8FAFC; padding: 6px; "
+	                             "  border: 0; border-bottom: 1px solid #E5E7EB; color: #475569; }"
+	                             "QPlainTextEdit { border: 1px solid #E5E7EB; border-radius: 4px; "
+	                             "  background: #FAFAFA; font-family: Menlo, Consolas, monospace; }"
+	                             "QLabel#StatusBadge { padding: 3px 10px; border-radius: 999px; "
+	                             "  background: #F1F5F9; color: #64748B; font-weight: 600; }"
+	                             "QLabel#StatusBadgeRunning { padding: 3px 10px; border-radius: 999px; "
+	                             "  background: #DCFCE7; color: #15803D; font-weight: 600; }"));
 
 	auto *mainLayout = new QVBoxLayout(this);
 	mainLayout->setContentsMargins(16, 16, 16, 12);
@@ -122,9 +121,9 @@ void OnlineServerDialog::buildUi() {
 	// Bottom status strip — always visible
 	auto *strip = new QWidget(this);
 	strip->setObjectName(QStringLiteral("StatusStrip"));
-	strip->setStyleSheet(QStringLiteral(
-	    "QWidget#StatusStrip { background: #F8FAFC; border: 1px solid #E5E7EB; "
-	    "  border-radius: 6px; }"));
+	strip->setStyleSheet(
+	    QStringLiteral("QWidget#StatusStrip { background: #F8FAFC; border: 1px solid #E5E7EB; "
+	                   "  border-radius: 6px; }"));
 	auto *stripLayout = new QHBoxLayout(strip);
 	stripLayout->setContentsMargins(12, 8, 12, 8);
 	stripStatusBadge_ = new QLabel(tr("已停止"), strip);
@@ -168,7 +167,7 @@ QWidget *OnlineServerDialog::buildServerTab() {
 	bindCombo_->addItem(tr("仅本机 (127.0.0.1)"), QStringLiteral("127.0.0.1"));
 	const auto addrs = QNetworkInterface::allAddresses();
 	for (const auto &a : addrs) {
-		if (a.protocol() == QAbstractSocket::IPv4Protocol && !a.isLoopback())
+		if (a.protocol() == QAbstractSocket::IPv4Protocol && ! a.isLoopback())
 			bindCombo_->addItem(a.toString(), a.toString());
 	}
 	portSpin_ = new QSpinBox(listenBox);
@@ -233,8 +232,8 @@ QWidget *OnlineServerDialog::buildServerTab() {
 	pdfRow->addWidget(setStatementBtn_);
 	pdfRow->addWidget(clearStatementBtn_);
 	pdfLayout->addLayout(pdfRow);
-	pdfLayout->addWidget(new QLabel(
-	    tr("提示：把题面 PDF 通过此处选择，会复制为比赛目录下的 statement.pdf。"), pdfBox));
+	pdfLayout->addWidget(
+	    new QLabel(tr("提示：把题面 PDF 通过此处选择，会复制为比赛目录下的 statement.pdf。"), pdfBox));
 	pdfLayout->itemAt(1)->widget()->setStyleSheet(QStringLiteral("color: #94A3B8;"));
 
 	layout->addWidget(pdfBox);
@@ -299,8 +298,8 @@ QWidget *OnlineServerDialog::buildContestTab() {
 		}
 	});
 	judgeLayout->addWidget(autoJudgeBox_);
-	auto *hint = new QLabel(
-	    tr("关闭时为手动评测：学生提交只写入 source 目录，老师在主窗口手动点评测。"), judgeBox);
+	auto *hint =
+	    new QLabel(tr("关闭时为手动评测：学生提交只写入 source 目录，老师在主窗口手动点评测。"), judgeBox);
 	hint->setStyleSheet(QStringLiteral("color: #94A3B8;"));
 	hint->setWordWrap(true);
 	judgeLayout->addWidget(hint);
@@ -316,7 +315,7 @@ QWidget *OnlineServerDialog::buildContestTab() {
 	pageStyleBox_->addItem(tr("默认（简洁版）"), QStringLiteral("default"));
 	pageStyleBox_->addItem(tr("北京活动风（深蓝渐变+几何）"), QStringLiteral("beijing"));
 	connect(pageStyleBox_, &QComboBox::currentIndexChanged, this, [this](int) {
-		if (!server_ || !pageStyleBox_)
+		if (! server_ || ! pageStyleBox_)
 			return;
 		const auto style = pageStyleBox_->currentData().toString();
 		server_->setPageStyle(style);
@@ -325,8 +324,8 @@ QWidget *OnlineServerDialog::buildContestTab() {
 	themeRow->addWidget(pageStyleBox_);
 	themeRow->addStretch();
 	themeLayout->addLayout(themeRow);
-	auto *themeHint = new QLabel(tr("决定学生打开的登录页、题目列表与提交页的外观，切换后需学生刷新页面。"),
-	                             themeBox);
+	auto *themeHint =
+	    new QLabel(tr("决定学生打开的登录页、题目列表与提交页的外观，切换后需学生刷新页面。"), themeBox);
 	themeHint->setStyleSheet(QStringLiteral("color: #94A3B8;"));
 	themeHint->setWordWrap(true);
 	themeLayout->addWidget(themeHint);
@@ -425,7 +424,7 @@ QWidget *OnlineServerDialog::buildLogTab() {
 }
 
 void OnlineServerDialog::refreshStatusStrip() {
-	if (!stripStatusBadge_)
+	if (! stripStatusBadge_)
 		return;
 	if (server_ && server_->isRunning()) {
 		stripStatusBadge_->setObjectName(QStringLiteral("StatusBadgeRunning"));
@@ -467,7 +466,7 @@ void OnlineServerDialog::onStartStop() {
 	const auto addrStr = bindCombo_->currentData().toString();
 	QHostAddress addr(addrStr);
 	QString err;
-	if (!server_->start(addr, static_cast<quint16>(portSpin_->value()), &err)) {
+	if (! server_->start(addr, static_cast<quint16>(portSpin_->value()), &err)) {
 		QMessageBox::critical(this, tr("错误"), tr("启动失败：%1").arg(err));
 		return;
 	}
@@ -488,17 +487,16 @@ void OnlineServerDialog::onStartStop() {
 }
 
 void OnlineServerDialog::onGenerateUsers() {
-	if (!server_ || contestDir_.isEmpty()) {
+	if (! server_ || contestDir_.isEmpty()) {
 		QMessageBox::warning(this, tr("提示"), tr("请先打开一场比赛。"));
 		return;
 	}
 	auto *store = server_->userStore();
-	if (!store)
+	if (! store)
 		return;
 	const auto batch = store->generateBatch(genCountSpin_->value(), genPrefixEdit_->text(), 8);
-	if (!store->saveToContestDir(contestDir_)) {
-		QMessageBox::critical(this, tr("错误"),
-		                      tr("无法保存 online_users.json"));
+	if (! store->saveToContestDir(contestDir_)) {
+		QMessageBox::critical(this, tr("错误"), tr("无法保存 online_users.json"));
 		return;
 	}
 	lastGeneratedRows_.clear();
@@ -513,10 +511,10 @@ void OnlineServerDialog::onGenerateUsers() {
 }
 
 void OnlineServerDialog::onAddUser() {
-	if (!server_ || contestDir_.isEmpty())
+	if (! server_ || contestDir_.isEmpty())
 		return;
 	auto *store = server_->userStore();
-	if (!store)
+	if (! store)
 		return;
 	const auto name = addNameEdit_->text().trimmed();
 	const auto pwd = addPwdEdit_->text();
@@ -525,8 +523,7 @@ void OnlineServerDialog::onAddUser() {
 		return;
 	}
 	if (store->exists(name)) {
-		if (QMessageBox::question(this, tr("确认"),
-		                          tr("用户 '%1' 已存在，是否覆盖其密码？").arg(name)) !=
+		if (QMessageBox::question(this, tr("确认"), tr("用户 '%1' 已存在，是否覆盖其密码？").arg(name)) !=
 		    QMessageBox::Yes)
 			return;
 	}
@@ -540,23 +537,22 @@ void OnlineServerDialog::onAddUser() {
 }
 
 void OnlineServerDialog::onRemoveUser() {
-	if (!server_ || contestDir_.isEmpty())
+	if (! server_ || contestDir_.isEmpty())
 		return;
-	if (!usersTable_ || !usersTable_->selectionModel())
+	if (! usersTable_ || ! usersTable_->selectionModel())
 		return;
 	auto *store = server_->userStore();
-	if (!store)
+	if (! store)
 		return;
 	const auto rows = usersTable_->selectionModel()->selectedRows();
 	if (rows.isEmpty())
 		return;
-	if (QMessageBox::question(this, tr("确认"),
-	                          tr("确定删除选中的 %1 个用户？").arg(rows.size())) !=
+	if (QMessageBox::question(this, tr("确认"), tr("确定删除选中的 %1 个用户？").arg(rows.size())) !=
 	    QMessageBox::Yes)
 		return;
 	for (const auto &idx : rows) {
 		auto *item = usersTable_->item(idx.row(), 0);
-		if (!item)
+		if (! item)
 			continue;
 		const auto name = item->text();
 		store->removeUser(name);
@@ -568,21 +564,20 @@ void OnlineServerDialog::onRemoveUser() {
 
 void OnlineServerDialog::onExportCsv() {
 	// Build rows from current store (covers users created earlier too)
-	if (!server_)
+	if (! server_)
 		return;
 	auto *store = server_->userStore();
-	if (!store || store->count() == 0) {
+	if (! store || store->count() == 0) {
 		QMessageBox::information(this, tr("提示"), tr("当前没有可导出的账号。"));
 		return;
 	}
 	const auto path = QFileDialog::getSaveFileName(
-	    this, tr("导出 CSV"),
-	    QDir(contestDir_).filePath(QStringLiteral("online_users_passwords.csv")),
+	    this, tr("导出 CSV"), QDir(contestDir_).filePath(QStringLiteral("online_users_passwords.csv")),
 	    tr("CSV 文件 (*.csv)"));
 	if (path.isEmpty())
 		return;
 	QFile f(path);
-	if (!f.open(QFile::WriteOnly | QFile::Text)) {
+	if (! f.open(QFile::WriteOnly | QFile::Text)) {
 		QMessageBox::critical(this, tr("错误"), f.errorString());
 		return;
 	}
@@ -628,21 +623,21 @@ static QStringList parseCsvLine(const QString &line) {
 }
 
 void OnlineServerDialog::onImportCsv() {
-	if (contestDir_.isEmpty() || !server_) {
+	if (contestDir_.isEmpty() || ! server_) {
 		QMessageBox::warning(this, tr("提示"), tr("请先打开一场比赛。"));
 		return;
 	}
 	auto *store = server_->userStore();
-	if (!store)
+	if (! store)
 		return;
 
-	const auto path = QFileDialog::getOpenFileName(this, tr("选择 CSV 文件"),
-	                                               contestDir_, tr("CSV 文件 (*.csv *.txt)"));
+	const auto path =
+	    QFileDialog::getOpenFileName(this, tr("选择 CSV 文件"), contestDir_, tr("CSV 文件 (*.csv *.txt)"));
 	if (path.isEmpty())
 		return;
 
 	QFile f(path);
-	if (!f.open(QFile::ReadOnly | QFile::Text)) {
+	if (! f.open(QFile::ReadOnly | QFile::Text)) {
 		QMessageBox::critical(this, tr("错误"), f.errorString());
 		return;
 	}
@@ -654,7 +649,7 @@ void OnlineServerDialog::onImportCsv() {
 	bool overwriteAll = false;
 	bool skipAllConflicts = false;
 
-	while (!ts.atEnd()) {
+	while (! ts.atEnd()) {
 		++lineNum;
 		QString line = ts.readLine();
 		if (lineNum == 1 && line.startsWith(QChar(0xFEFF)))
@@ -666,8 +661,8 @@ void OnlineServerDialog::onImportCsv() {
 		// header detection: first line containing 'username' / '用户名' is treated as header
 		if (lineNum == 1) {
 			const auto lower = trimmed.toLower();
-			if (lower.contains("username") || lower.contains("用户名") ||
-			    lower.contains("user_name") || lower.contains("name,"))
+			if (lower.contains("username") || lower.contains("用户名") || lower.contains("user_name") ||
+			    lower.contains("name,"))
 				continue;
 		}
 
@@ -694,8 +689,7 @@ void OnlineServerDialog::onImportCsv() {
 			// no password column in this row → auto-generate one
 			QByteArray buf(8, Qt::Uninitialized);
 			auto *gen = QRandomGenerator::system();
-			static const char alphabet[] =
-			    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+			static const char alphabet[] = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 			for (int i = 0; i < buf.size(); ++i)
 				buf[i] = alphabet[gen->bounded(int(sizeof(alphabet) - 1))];
 			password = QString::fromLatin1(buf);
@@ -706,7 +700,7 @@ void OnlineServerDialog::onImportCsv() {
 				++skipped;
 				continue;
 			}
-			if (!overwriteAll) {
+			if (! overwriteAll) {
 				QMessageBox box(this);
 				box.setIcon(QMessageBox::Question);
 				box.setWindowTitle(tr("用户已存在"));
@@ -738,8 +732,7 @@ void OnlineServerDialog::onImportCsv() {
 
 	store->saveToContestDir(contestDir_);
 	refreshUsersTable();
-	appendLog(tr("CSV 导入完成：新增 %1，覆盖 %2，跳过 %3")
-	              .arg(added).arg(overwritten).arg(skipped));
+	appendLog(tr("CSV 导入完成：新增 %1，覆盖 %2，跳过 %3").arg(added).arg(overwritten).arg(skipped));
 	QMessageBox::information(
 	    this, tr("导入结果"),
 	    tr("新增 %1 个账号，覆盖 %2 个已有账号，跳过 %3 行。").arg(added).arg(overwritten).arg(skipped));
@@ -748,15 +741,14 @@ void OnlineServerDialog::onImportCsv() {
 void OnlineServerDialog::onSavePlaintextList() { writePlaintextCsv(true); }
 
 void OnlineServerDialog::writePlaintextCsv(bool announce) {
-	if (contestDir_.isEmpty() || !server_)
+	if (contestDir_.isEmpty() || ! server_)
 		return;
 	auto *store = server_->userStore();
-	if (!store || store->count() == 0)
+	if (! store || store->count() == 0)
 		return;
-	const auto path =
-	    QDir(contestDir_).filePath(QStringLiteral("online_users_passwords.csv"));
+	const auto path = QDir(contestDir_).filePath(QStringLiteral("online_users_passwords.csv"));
 	QFile f(path);
-	if (!f.open(QFile::WriteOnly | QFile::Text))
+	if (! f.open(QFile::WriteOnly | QFile::Text))
 		return;
 	QTextStream ts(&f);
 	ts.setEncoding(QStringConverter::Utf8);
@@ -768,12 +760,12 @@ void OnlineServerDialog::writePlaintextCsv(bool announce) {
 }
 
 void OnlineServerDialog::refreshUsersTable() {
-	if (!server_)
+	if (! server_)
 		return;
 	auto *store = server_->userStore();
-	if (!store)
+	if (! store)
 		return;
-	if (!usersTable_)
+	if (! usersTable_)
 		return;
 	const auto names = store->allUsernames();
 	usersTable_->setRowCount(names.size());
@@ -796,8 +788,8 @@ void OnlineServerDialog::onSetStatementPdf() {
 		QMessageBox::warning(this, tr("提示"), tr("请先打开一场比赛。"));
 		return;
 	}
-	const auto src = QFileDialog::getOpenFileName(this, tr("选择题面 PDF"),
-	                                              QString(), tr("PDF 文件 (*.pdf)"));
+	const auto src =
+	    QFileDialog::getOpenFileName(this, tr("选择题面 PDF"), QString(), tr("PDF 文件 (*.pdf)"));
 	if (src.isEmpty())
 		return;
 	const auto dst = QDir(contestDir_).filePath(QStringLiteral("statement.pdf"));
@@ -807,13 +799,12 @@ void OnlineServerDialog::onSetStatementPdf() {
 		return;
 	}
 	if (QFile::exists(dst)) {
-		if (QMessageBox::question(this, tr("确认"),
-		                          tr("比赛目录下已存在 statement.pdf，是否覆盖？")) !=
+		if (QMessageBox::question(this, tr("确认"), tr("比赛目录下已存在 statement.pdf，是否覆盖？")) !=
 		    QMessageBox::Yes)
 			return;
 		QFile::remove(dst);
 	}
-	if (!QFile::copy(src, dst)) {
+	if (! QFile::copy(src, dst)) {
 		QMessageBox::critical(this, tr("错误"), tr("复制失败：%1").arg(src));
 		return;
 	}
@@ -825,14 +816,13 @@ void OnlineServerDialog::onClearStatementPdf() {
 	if (contestDir_.isEmpty())
 		return;
 	const auto p = QDir(contestDir_).filePath(QStringLiteral("statement.pdf"));
-	if (!QFile::exists(p)) {
+	if (! QFile::exists(p)) {
 		appendLog(tr("当前没有题面 PDF，无需清除"));
 		return;
 	}
-	if (QMessageBox::question(this, tr("确认"),
-	                          tr("是否删除 %1？").arg(p)) != QMessageBox::Yes)
+	if (QMessageBox::question(this, tr("确认"), tr("是否删除 %1？").arg(p)) != QMessageBox::Yes)
 		return;
-	if (!QFile::remove(p)) {
+	if (! QFile::remove(p)) {
 		QMessageBox::critical(this, tr("错误"), tr("删除失败：%1").arg(p));
 		return;
 	}
@@ -841,7 +831,7 @@ void OnlineServerDialog::onClearStatementPdf() {
 }
 
 void OnlineServerDialog::onApplyContestWindow() {
-	if (!server_)
+	if (! server_)
 		return;
 	const auto enabled = windowEnableBox_->isChecked();
 	const auto start = startEdit_->dateTime();
@@ -854,14 +844,13 @@ void OnlineServerDialog::onApplyContestWindow() {
 	refreshContestWindow();
 	if (enabled)
 		appendLog(tr("已设定比赛时间：%1 ~ %2")
-		              .arg(start.toString("yyyy-MM-dd HH:mm"),
-		                   end.toString("yyyy-MM-dd HH:mm")));
+		              .arg(start.toString("yyyy-MM-dd HH:mm"), end.toString("yyyy-MM-dd HH:mm")));
 	else
 		appendLog(tr("已关闭比赛时间限制"));
 }
 
 void OnlineServerDialog::refreshContestWindow() {
-	if (!server_ || !windowEnableBox_)
+	if (! server_ || ! windowEnableBox_)
 		return;
 	if (autoJudgeBox_)
 		autoJudgeBox_->setChecked(server_->autoJudge());
@@ -880,15 +869,15 @@ void OnlineServerDialog::refreshContestWindow() {
 		startEdit_->setDateTime(server_->startTime());
 	if (server_->endTime().isValid())
 		endEdit_->setDateTime(server_->endTime());
-	if (!en) {
+	if (! en) {
 		windowStatusLabel_->setText(tr("当前：未启用，任何时间都允许提交"));
 		return;
 	}
 	const auto now = QDateTime::currentDateTime();
 	if (server_->startTime().isValid() && now < server_->startTime())
-		windowStatusLabel_->setText(tr("当前：未开始（距离开始 %1）")
-		                                .arg(QString::number(now.secsTo(server_->startTime()) / 60) +
-		                                     tr(" 分钟")));
+		windowStatusLabel_->setText(
+		    tr("当前：未开始（距离开始 %1）")
+		        .arg(QString::number(now.secsTo(server_->startTime()) / 60) + tr(" 分钟")));
 	else if (server_->endTime().isValid() && now > server_->endTime())
 		windowStatusLabel_->setText(tr("当前：已结束"));
 	else
@@ -896,12 +885,14 @@ void OnlineServerDialog::refreshContestWindow() {
 }
 
 void OnlineServerDialog::refreshStatementHint() {
-	if (!statementLabel_)
+	if (! statementLabel_)
 		return;
 	if (contestDir_.isEmpty()) {
 		statementLabel_->setText(tr("（尚未绑定比赛）"));
-		if (setStatementBtn_) setStatementBtn_->setEnabled(false);
-		if (clearStatementBtn_) clearStatementBtn_->setEnabled(false);
+		if (setStatementBtn_)
+			setStatementBtn_->setEnabled(false);
+		if (clearStatementBtn_)
+			clearStatementBtn_->setEnabled(false);
 		return;
 	}
 	const auto p = QDir(contestDir_).filePath(QStringLiteral("statement.pdf"));
@@ -909,21 +900,22 @@ void OnlineServerDialog::refreshStatementHint() {
 	if (exists)
 		statementLabel_->setText(tr("已找到：%1").arg(p));
 	else
-		statementLabel_->setText(
-		    tr("未设定。点击右侧按钮选择 PDF 文件。"));
-	if (setStatementBtn_) setStatementBtn_->setEnabled(true);
-	if (clearStatementBtn_) clearStatementBtn_->setEnabled(exists);
+		statementLabel_->setText(tr("未设定。点击右侧按钮选择 PDF 文件。"));
+	if (setStatementBtn_)
+		setStatementBtn_->setEnabled(true);
+	if (clearStatementBtn_)
+		clearStatementBtn_->setEnabled(exists);
 }
 
 void OnlineServerDialog::appendLog(const QString &msg) {
-	if (!logView_)
+	if (! logView_)
 		return;
 	logView_->appendPlainText(QDateTime::currentDateTime().toString("hh:mm:ss") + "  " + msg);
 }
 
 QString OnlineServerDialog::detectLocalIp() const {
 	for (const auto &a : QNetworkInterface::allAddresses()) {
-		if (a.protocol() == QAbstractSocket::IPv4Protocol && !a.isLoopback())
+		if (a.protocol() == QAbstractSocket::IPv4Protocol && ! a.isLoopback())
 			return a.toString();
 	}
 	return QStringLiteral("127.0.0.1");

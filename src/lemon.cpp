@@ -263,9 +263,8 @@ void LemonLime::showOptionsDialog() {
 #ifdef LEMON_ONLINE_SERVER
 void LemonLime::showOnlineServerDialog() {
 	if (! curContest) {
-		QMessageBox::information(
-		    this, tr("在线提交服务"),
-		    tr("请先打开一场比赛。提交服务会绑定到当前打开的比赛。"));
+		QMessageBox::information(this, tr("在线提交服务"),
+		                         tr("请先打开一场比赛。提交服务会绑定到当前打开的比赛。"));
 		return;
 	}
 	if (! onlineServerDialog) {

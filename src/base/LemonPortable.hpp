@@ -109,9 +109,7 @@ namespace Lemon::Portable {
 	// portable mode this is the very same object the plain constructor made.
 	inline auto settings() -> QSettings {
 		if (isEnabled())
-			return QSettings(QSettings::IniFormat,
-			                 QSettings::UserScope,
-			                 QStringLiteral("LemonLime"),
+			return QSettings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("LemonLime"),
 			                 QStringLiteral("lemon"));
 
 		return QSettings(QStringLiteral("LemonLime"), QStringLiteral("lemon"));
@@ -142,7 +140,8 @@ namespace Lemon::Portable {
 
 			// Only a directory that really holds a tool counts as a toolchain; an
 			// empty or half-copied layout must not end up on the PATH.
-			for (const auto &tool : {QStringLiteral("g++"), QStringLiteral("gcc"), QStringLiteral("python")}) {
+			for (const auto &tool :
+			     {QStringLiteral("g++"), QStringLiteral("gcc"), QStringLiteral("python")}) {
 				if (QFileInfo::exists(bin.filePath(tool)) ||
 				    QFileInfo::exists(bin.filePath(tool + QStringLiteral(".exe")))) {
 					result << bin.absolutePath();

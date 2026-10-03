@@ -17,41 +17,41 @@
 #include <QTextStream>
 
 namespace {
-constexpr auto kFileName = "online_users.json";
-constexpr auto kPlaintextCsvName = "online_users_passwords.csv";
-constexpr auto kPasswordAlphabet =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"; // ambiguous chars stripped
+	constexpr auto kFileName = "online_users.json";
+	constexpr auto kPlaintextCsvName = "online_users_passwords.csv";
+	constexpr auto kPasswordAlphabet =
+	    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"; // ambiguous chars stripped
 
-// Tolerant single-line CSV parser: handles quoted fields and embedded commas.
-QStringList parseCsvLine(const QString &line) {
-	QStringList out;
-	QString cur;
-	bool inQuote = false;
-	for (int i = 0; i < line.size(); ++i) {
-		const QChar c = line.at(i);
-		if (inQuote) {
-			if (c == '"') {
-				if (i + 1 < line.size() && line.at(i + 1) == '"') {
-					cur.append('"');
-					++i;
+	// Tolerant single-line CSV parser: handles quoted fields and embedded commas.
+	QStringList parseCsvLine(const QString &line) {
+		QStringList out;
+		QString cur;
+		bool inQuote = false;
+		for (int i = 0; i < line.size(); ++i) {
+			const QChar c = line.at(i);
+			if (inQuote) {
+				if (c == '"') {
+					if (i + 1 < line.size() && line.at(i + 1) == '"') {
+						cur.append('"');
+						++i;
+					} else {
+						inQuote = false;
+					}
 				} else {
-					inQuote = false;
+					cur.append(c);
 				}
+			} else if (c == ',') {
+				out.append(cur);
+				cur.clear();
+			} else if (c == '"' && cur.isEmpty()) {
+				inQuote = true;
 			} else {
 				cur.append(c);
 			}
-		} else if (c == ',') {
-			out.append(cur);
-			cur.clear();
-		} else if (c == '"' && cur.isEmpty()) {
-			inQuote = true;
-		} else {
-			cur.append(c);
 		}
+		out.append(cur);
+		return out;
 	}
-	out.append(cur);
-	return out;
-}
 } // namespace
 
 UserStore::UserStore(QObject *parent) : QObject(parent) {}
@@ -59,10 +59,10 @@ UserStore::UserStore(QObject *parent) : QObject(parent) {}
 bool UserStore::loadFromContestDir(const QString &contestDir) {
 	users_.clear();
 	QFile f(QDir(contestDir).filePath(kFileName));
-	if (!f.exists()) {
+	if (! f.exists()) {
 		return true; // no file yet — empty store is valid
 	}
-	if (!f.open(QFile::ReadOnly)) {
+	if (! f.open(QFile::ReadOnly)) {
 		lastError_ = f.errorString();
 		return false;
 	}
@@ -83,7 +83,7 @@ bool UserStore::loadFromContestDir(const QString &contestDir) {
 		user.passwordHash = QByteArray::fromBase64(u.value("hash").toString().toLatin1());
 		user.iterations = u.value("iter").toInt(100000);
 		user.plaintext = u.value("pw").toString();
-		if (!user.username.isEmpty())
+		if (! user.username.isEmpty())
 			users_.insert(user.username, user);
 	}
 	loadPlaintextFromCsv(contestDir);
@@ -96,12 +96,12 @@ bool UserStore::loadFromContestDir(const QString &contestDir) {
 // where plaintext is stored (written on batch generation).
 void UserStore::loadPlaintextFromCsv(const QString &contestDir) {
 	QFile f(QDir(contestDir).filePath(QLatin1String(kPlaintextCsvName)));
-	if (!f.open(QFile::ReadOnly | QFile::Text))
+	if (! f.open(QFile::ReadOnly | QFile::Text))
 		return;
 	QTextStream ts(&f);
 	ts.setEncoding(QStringConverter::Utf8);
 	bool first = true;
-	while (!ts.atEnd()) {
+	while (! ts.atEnd()) {
 		QString line = ts.readLine();
 		if (first) {
 			first = false;
@@ -141,12 +141,12 @@ bool UserStore::saveToContestDir(const QString &contestDir) const {
 	root.insert("users", arr);
 
 	QSaveFile f(QDir(contestDir).filePath(kFileName));
-	if (!f.open(QFile::WriteOnly)) {
+	if (! f.open(QFile::WriteOnly)) {
 		lastError_ = f.errorString();
 		return false;
 	}
 	f.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
-	if (!f.commit()) {
+	if (! f.commit()) {
 		lastError_ = f.errorString();
 		return false;
 	}
@@ -243,6 +243,6 @@ QString UserStore::makePassword(int len) {
 }
 
 QByteArray UserStore::pbkdf2(const QString &password, const QByteArray &salt, int iterations) {
-	return QPasswordDigestor::deriveKeyPbkdf2(QCryptographicHash::Sha256, password.toUtf8(), salt,
-	                                          iterations, 32);
+	return QPasswordDigestor::deriveKeyPbkdf2(QCryptographicHash::Sha256, password.toUtf8(), salt, iterations,
+	                                          32);
 }
