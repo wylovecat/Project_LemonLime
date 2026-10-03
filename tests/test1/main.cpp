@@ -35,7 +35,12 @@ static Settings *createSettings(QObject *parent = nullptr) {
 	s->setDefaultTimeLimit(1000);
 	s->setDefaultMemoryLimit(512);
 	s->setDefaultExtraTimeRatio(0.2);
-	s->setCompileTimeLimit(20000);
+	// Generous on purpose: a cold CI runner pays the one-time start-up cost of
+	// the whole tool chain on the very first compile, which was measured above
+	// 20 s on windows-latest, while later compiles of the same file take a few
+	// seconds.  With a tight limit the first task of the contest fails to
+	// compile and every expectation below collapses.
+	s->setCompileTimeLimit(60000);
 	s->setSpecialJudgeTimeLimit(10000);
 	s->setFileSizeLimit(50);
 	s->setRejudgeTimes(1);
