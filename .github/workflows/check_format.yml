@@ -2,6 +2,12 @@ name: "Check Clang Format"
 
 on: [push, pull_request]
 
+# The action below commits the formatting changes back to the branch
+# (auto-commit: true) via GITHUB_TOKEN; the repository default is a read-only
+# token, so ask for write access explicitly.
+permissions:
+  contents: write
+
 jobs:
   format:
     name: "Check Clang Format"

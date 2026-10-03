@@ -351,8 +351,9 @@ class TestContest : public QObject {
 			const auto &res = user2->getResult(aplusbIdx);
 			QCOMPARE(res.size(), 1);
 			QCOMPARE(res.at(0).size(), 1);
-			QVERIFY2(res.at(0).at(0) == CompileFailed,
-			         qPrintable(QString("user2 aplusb: expected CompileFailed, got %1").arg(res.at(0).at(0))));
+			QVERIFY2(
+			    res.at(0).at(0) == CompileFailed,
+			    qPrintable(QString("user2 aplusb: expected CompileFailed, got %1").arg(res.at(0).at(0))));
 		}
 
 		delete contest;
