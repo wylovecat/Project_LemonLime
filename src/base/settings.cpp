@@ -366,6 +366,12 @@ void Settings::setTextAndColor(ResultState result, QString &text, QString &frCol
 			frColor = "rgb(255, 255, 255)";
 			bgColor = "rgb(0, 0, 128)";
 			break;
+
+		case CompileFailed:
+			text = tr("Compile error");
+			frColor = "rgb(255, 255, 255)";
+			bgColor = "rgb(160, 0, 0)";
+			break;
 	}
 }
 

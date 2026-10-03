@@ -33,6 +33,11 @@ enum ResultState {
 	InteractorError,
 	PresentationError,
 	OutputLimitExceeded,
+	// The states above are stored in contest files, so a new one is only ever
+	// appended: CompileFailed means "the submission never ran because it could
+	// not be compiled".  (It cannot be called CompileError because CompileState
+	// already declares that enumerator in the same scope.)
+	CompileFailed,
 	LastResultState
 };
 

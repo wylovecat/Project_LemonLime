@@ -258,6 +258,12 @@ class TestContest : public QObject {
 				         qPrintable(QString("Contestant '%1' task %2 was not judged")
 				                        .arg(c->getContestantName())
 				                        .arg(taskIdx)));
+
+				// A judged task always reports one entry per test case, even when
+				// the submission could not be prepared at all (user2 has no aplusb
+				// source): a judged task must never have an empty result table.
+				QCOMPARE(c->getResult(taskIdx).size(),
+				         contest->getTaskList().at(taskIdx)->getTestCaseList().size());
 			}
 		}
 
@@ -330,6 +336,23 @@ class TestContest : public QObject {
 			// case 5: WA (empty output)
 			QVERIFY2(res[5][0] == WrongAnswer,
 			         qPrintable(QString("user1 helloworld case 5: expected WA, got %1").arg(res[5][0])));
+		}
+
+		// --- user2 has no aplusb source: every test case must report the failure ---
+		// (user2, aplusb) cannot be prepared at all, so the task is judged with
+		// one CompileFailed per test case instead of an empty result table.
+		int aplusbIdx = -1;
+		for (int i = 0; i < tasks.size(); i++) {
+			if (tasks[i]->getProblemTitle() == "aplusb")
+				aplusbIdx = i;
+		}
+		QVERIFY2(aplusbIdx >= 0, "Task 'aplusb' not found");
+		{
+			const auto &res = user2->getResult(aplusbIdx);
+			QCOMPARE(res.size(), 1);
+			QCOMPARE(res.at(0).size(), 1);
+			QVERIFY2(res.at(0).at(0) == CompileFailed,
+			         qPrintable(QString("user2 aplusb: expected CompileFailed, got %1").arg(res.at(0).at(0))));
 		}
 
 		delete contest;

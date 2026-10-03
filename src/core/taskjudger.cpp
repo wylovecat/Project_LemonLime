@@ -368,16 +368,6 @@ int TaskJudger::judge() {
 	if (! temporaryDir.isValid())
 		return 0;
 
-	if (task->getTaskType() != Task::AnswersOnly)
-		if (! traditionalTaskPrepare())
-			return 1;
-
-	std::shared_ptr<WindowsSandboxSession> sandboxSession;
-#ifdef Q_OS_WIN
-	if (sandboxSettings.enabled)
-		sandboxSession = WindowsSandbox::createSession();
-#endif
-
 	for (int i = 0; i < task->getTestCaseList().size(); i++) {
 		timeUsed.append(QList<int>());
 		memoryUsed.append(QList<qint64>());
@@ -397,6 +387,28 @@ int TaskJudger::judge() {
 			inputFiles[i].append("");
 		}
 	}
+
+	if (task->getTaskType() != Task::AnswersOnly) {
+		if (! traditionalTaskPrepare()) {
+			// traditionalTaskPrepare() has already reported what went wrong
+			// (no usable source file, the compiler refused the code, the
+			// compile time limit was hit, ...).  The task still counts as
+			// judged, but leaving the result table empty made a broken
+			// submission - or a broken tool chain - look like a judged task
+			// without any results, so record the failure for every test case.
+			for (int i = 0; i < result.size(); i++)
+				for (int j = 0; j < result[i].size(); j++)
+					result[i][j] = CompileFailed;
+
+			return 1;
+		}
+	}
+
+	std::shared_ptr<WindowsSandboxSession> sandboxSession;
+#ifdef Q_OS_WIN
+	if (sandboxSettings.enabled)
+		sandboxSession = WindowsSandbox::createSession();
+#endif
 
 	for (int i = 0; i < task->getTestCaseList().size(); i++) {
 

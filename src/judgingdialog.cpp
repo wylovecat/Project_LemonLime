@@ -215,6 +215,12 @@ void JudgingDialog::singleCaseFinished(QString contestantName, int progress, int
 			charFormat.setForeground(QBrush(Qt::white));
 			charFormat.setBackground(QBrush(Qt::darkMagenta));
 			break;
+
+		case CompileFailed:
+			text = tr("Compile error");
+			charFormat.setForeground(QBrush(Qt::white));
+			charFormat.setBackground(QBrush(Qt::darkRed));
+			break;
 	}
 
 	cursor->insertText(tr("Contestant %3 Test case %1.%2: ").arg(x + 1).arg(y + 1).arg(contestantName),
