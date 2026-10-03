@@ -21,7 +21,7 @@ jobs:
     name: Build
     strategy:
       matrix:
-        qt_version: [6.9.3]
+        qt_version: [6.12.0]
         build_type: [Release, RelWithDebInfo, Debug]
         platform: [windows-latest]
         include:
@@ -67,6 +67,7 @@ jobs:
           # (ENABLE_ONLINE_SERVER=ON by default, which is a hard configure error
           # when Qt6::HttpServer is missing) and its server-smoke test.
           modules: "qtactiveqt qthttpserver qtwebsockets"
+          aqtsource: "git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7"
 
       - name: Win-x64 - ${{ matrix.qt_version }} - Generate Dependencies and Build
         shell: bash
