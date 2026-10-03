@@ -77,7 +77,7 @@ jobs:
           cd ..
           mkdir build
           cd build
-          # qt-6.9-static-linux.tar.gz is built without the Qt HttpServer module,
+          # qt-6.12-static-linux.tar.gz is built without the Qt HttpServer module,
           # so the embedded online submission service cannot be compiled in.
           # The online server is compiled and tested by the shared-Qt Linux job
           # in linux-qt6.yml; this static build intentionally ships without it.
