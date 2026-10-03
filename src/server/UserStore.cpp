@@ -14,12 +14,45 @@
 #include <QPasswordDigestor>
 #include <QRandomGenerator>
 #include <QSaveFile>
+#include <QTextStream>
 
 namespace {
 constexpr auto kFileName = "online_users.json";
+constexpr auto kPlaintextCsvName = "online_users_passwords.csv";
 constexpr auto kPasswordAlphabet =
     "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"; // ambiguous chars stripped
+
+// Tolerant single-line CSV parser: handles quoted fields and embedded commas.
+QStringList parseCsvLine(const QString &line) {
+	QStringList out;
+	QString cur;
+	bool inQuote = false;
+	for (int i = 0; i < line.size(); ++i) {
+		const QChar c = line.at(i);
+		if (inQuote) {
+			if (c == '"') {
+				if (i + 1 < line.size() && line.at(i + 1) == '"') {
+					cur.append('"');
+					++i;
+				} else {
+					inQuote = false;
+				}
+			} else {
+				cur.append(c);
+			}
+		} else if (c == ',') {
+			out.append(cur);
+			cur.clear();
+		} else if (c == '"' && cur.isEmpty()) {
+			inQuote = true;
+		} else {
+			cur.append(c);
+		}
+	}
+	out.append(cur);
+	return out;
 }
+} // namespace
 
 UserStore::UserStore(QObject *parent) : QObject(parent) {}
 
@@ -53,7 +86,41 @@ bool UserStore::loadFromContestDir(const QString &contestDir) {
 		if (!user.username.isEmpty())
 			users_.insert(user.username, user);
 	}
+	loadPlaintextFromCsv(contestDir);
 	return true;
+}
+
+// Plaintext passwords are deliberately kept out of online_users.json, but the
+// teacher still needs to re-export the account list after reopening a contest.
+// Recover them from online_users_passwords.csv, the documented single place
+// where plaintext is stored (written on batch generation).
+void UserStore::loadPlaintextFromCsv(const QString &contestDir) {
+	QFile f(QDir(contestDir).filePath(QLatin1String(kPlaintextCsvName)));
+	if (!f.open(QFile::ReadOnly | QFile::Text))
+		return;
+	QTextStream ts(&f);
+	ts.setEncoding(QStringConverter::Utf8);
+	bool first = true;
+	while (!ts.atEnd()) {
+		QString line = ts.readLine();
+		if (first) {
+			first = false;
+			if (line.startsWith(QChar(0xFEFF)))
+				line.remove(0, 1); // strip UTF-8 BOM
+			if (line.contains(QLatin1String("username")) && line.contains(QLatin1String("password")))
+				continue; // header row
+		}
+		if (line.trimmed().isEmpty())
+			continue;
+		const auto fields = parseCsvLine(line);
+		if (fields.size() < 3)
+			continue;
+		const auto it = users_.find(fields.at(0));
+		if (it == users_.end())
+			continue;
+		if (it->plaintext.isEmpty())
+			it->plaintext = fields.at(2);
+	}
 }
 
 bool UserStore::saveToContestDir(const QString &contestDir) const {

@@ -532,6 +532,7 @@ void OnlineServerDialog::onAddUser() {
 	}
 	store->addUser(name, name, pwd);
 	store->saveToContestDir(contestDir_);
+	writePlaintextCsv(false);
 	addNameEdit_->clear();
 	addPwdEdit_->clear();
 	refreshUsersTable();
@@ -561,6 +562,7 @@ void OnlineServerDialog::onRemoveUser() {
 		store->removeUser(name);
 	}
 	store->saveToContestDir(contestDir_);
+	writePlaintextCsv(false);
 	refreshUsersTable();
 }
 
@@ -743,7 +745,9 @@ void OnlineServerDialog::onImportCsv() {
 	    tr("新增 %1 个账号，覆盖 %2 个已有账号，跳过 %3 行。").arg(added).arg(overwritten).arg(skipped));
 }
 
-void OnlineServerDialog::onSavePlaintextList() {
+void OnlineServerDialog::onSavePlaintextList() { writePlaintextCsv(true); }
+
+void OnlineServerDialog::writePlaintextCsv(bool announce) {
 	if (contestDir_.isEmpty() || !server_)
 		return;
 	auto *store = server_->userStore();
@@ -759,7 +763,8 @@ void OnlineServerDialog::onSavePlaintextList() {
 	ts << "username,display_name,password\n";
 	for (const auto &name : store->allUsernames())
 		ts << name << "," << store->displayNameOf(name) << "," << store->plaintextOf(name) << "\n";
-	appendLog(tr("已自动保存明文清单至 %1").arg(path));
+	if (announce)
+		appendLog(tr("已自动保存明文清单至 %1").arg(path));
 }
 
 void OnlineServerDialog::refreshUsersTable() {

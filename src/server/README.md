@@ -15,8 +15,8 @@
 └── online_users_passwords.csv  # 批量生成账号时自动落盘的明文清单
 ```
 
-> **注意**：`online_users_passwords.csv` 是唯一保留明文密码的地方，且只在执行"批量生成"时才更新。请妥善保管，分发完即建议删除。
-> `online_users.json` 只存盐值 + PBKDF2 哈希（明文仅存在于内存，用于导出 CSV）。若目录里存在旧版本生成的 `online_users.json`（含 `"pw"` 字段），建议删除后重新批量生成账号。
+> **注意**：`online_users_passwords.csv` 是唯一保留明文密码的地方，在批量生成、新增/删除账号时更新。请妥善保管，分发完即建议删除。
+> `online_users.json` 只存盐值 + PBKDF2 哈希，不含明文。重新打开比赛时，明文会从这个 CSV 读回内存，以便再次导出账号表——**删掉 CSV 后就只能得到空密码，无法再导出明文**。若目录里存在旧版本生成的 `online_users.json`（含 `"pw"` 字段），建议删除后重新批量生成账号。
 
 ## 教师工作流
 

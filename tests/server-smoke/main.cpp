@@ -103,6 +103,7 @@ class TestServerSmoke : public QObject {
 	void cleanupTestCase();
 
 	void testUsersFileHasNoPlaintext();
+	void testPlaintextRecoveredFromCsvAfterReload();
 	void testLoginRejectsBadPassword();
 	void testSubmitWritesSourceFile();
 	void testResubmissionOverwrites();
@@ -173,6 +174,33 @@ void TestServerSmoke::testUsersFileHasNoPlaintext() {
 		         "online_users.json must not persist plaintext passwords");
 	QVERIFY(server_->userStore()->verify(QStringLiteral("stu01"), password1_));
 	QVERIFY(! server_->userStore()->verify(QStringLiteral("stu01"), QStringLiteral("wrong")));
+}
+
+// Reopening a contest must still let the teacher export the account list with
+// real passwords. Plaintext is absent from online_users.json, so it has to be
+// recovered from online_users_passwords.csv (the documented single plaintext
+// store, written on batch generation).
+void TestServerSmoke::testPlaintextRecoveredFromCsvAfterReload() {
+	QFile csv(contestDir_.filePath(QStringLiteral("online_users_passwords.csv")));
+	QVERIFY(csv.open(QFile::WriteOnly | QFile::Text));
+	{
+		QTextStream ts(&csv);
+		ts.setEncoding(QStringConverter::Utf8);
+		ts << "username,display_name,password\n";
+		ts << "stu01,stu01," << password1_ << "\n";
+		ts << "stu02,stu02," << password2_ << "\n";
+	}
+	csv.close();
+
+	UserStore reloaded;
+	QVERIFY(reloaded.loadFromContestDir(contestDir_.path()));
+	QCOMPARE(reloaded.plaintextOf(QStringLiteral("stu01")), password1_);
+	QCOMPARE(reloaded.plaintextOf(QStringLiteral("stu02")), password2_);
+	// the recovered plaintext must still verify against the hashed store
+	QVERIFY(reloaded.verify(QStringLiteral("stu01"), password1_));
+
+	// and a CSV entry for an unknown user must be ignored, not resurrected
+	QVERIFY(reloaded.allUsernames().size() == 2);
 }
 
 void TestServerSmoke::testLoginRejectsBadPassword() {

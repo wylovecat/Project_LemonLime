@@ -51,6 +51,7 @@ class UserStore : public QObject {
 	QMap<QString, User> users_;
 	mutable QString lastError_;
 
+	void loadPlaintextFromCsv(const QString &contestDir);
 	static QByteArray makeSalt(int len = 16);
 	static QString makePassword(int len);
 	static QByteArray pbkdf2(const QString &password, const QByteArray &salt, int iterations);

@@ -55,6 +55,7 @@ class OnlineServerDialog : public QDialog {
 	QWidget *buildLogTab();
 	QString detectLocalIp() const;
 	void refreshStatusStrip();
+	void writePlaintextCsv(bool announce);
 
 	QPointer<Contest> contest_;
 	QString contestDir_;
