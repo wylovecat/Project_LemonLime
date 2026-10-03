@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QDateTime>
+#include <QHash>
 #include <QHostAddress>
 #include <QObject>
 #include <QPointer>
@@ -55,6 +56,11 @@ class SubmissionServer : public QObject {
 	QString submitMode() const { return submitMode_; }
 	void setSubmitMode(const QString &mode);
 
+	// Login throttling: at most maxFailures failed logins per client IP within
+	// windowSeconds, after which further attempts are refused until the window
+	// rolls over. Keeps classmates from hammering someone else's account.
+	void setLoginRateLimit(int maxFailures, int windowSeconds);
+
 	bool loadConfig();
 	bool saveConfig() const;
 
@@ -87,6 +93,19 @@ class SubmissionServer : public QObject {
 	bool writeSubmission(const QString &username, int taskIndex, const QByteArray &source,
 	                     const QString &extension, QString *errOut);
 	void appendAuditLog(const QString &username, int taskIndex, qint64 bytes, const QString &sha256);
+
+	// Login throttle bookkeeping (requests are handled on the server's thread).
+	struct LoginThrottle {
+		int failures = 0;
+		QDateTime windowStart;
+	};
+	bool loginAttemptAllowed(const QString &ip);
+	void recordLoginFailure(const QString &ip);
+	void clearLoginFailures(const QString &ip);
+	void pruneLoginThrottle();
+	QHash<QString, LoginThrottle> loginThrottle_;
+	int loginMaxFailures_ = 10;
+	int loginWindowSeconds_ = 300;
 
 	QHttpServer *http_ = nullptr;
 	QTcpServer *tcp_ = nullptr;

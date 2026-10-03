@@ -339,17 +339,65 @@ QHttpServerResponse SubmissionServer::htmlPage(const QString &name) const {
 QHttpServerResponse SubmissionServer::handleLoginPage() { return htmlPage(QStringLiteral("login")); }
 
 QHttpServerResponse SubmissionServer::handleLoginPost(const QHttpServerRequest &req) {
+	const auto clientIp = req.remoteAddress().toString();
+	if (! loginAttemptAllowed(clientIp)) {
+		emit logMessage(tr("Login blocked (too many failures from %1)").arg(clientIp));
+		return redirect("/login?err=rate");
+	}
 	const auto form = parseFormUrlEncoded(req.body());
 	const auto username = form.value("username").trimmed();
 	const auto password = form.value("password");
-	if (username.isEmpty() || password.isEmpty())
+	if (username.isEmpty() || password.isEmpty() || ! userStore_ ||
+	    ! userStore_->verify(username, password)) {
+		recordLoginFailure(clientIp);
 		return redirect("/login?err=1");
-	if (! userStore_ || ! userStore_->verify(username, password))
-		return redirect("/login?err=1");
+	}
+	clearLoginFailures(clientIp);
 	const auto token = sessions_->createSession(username);
 	const auto cookie = QStringLiteral("%1=%2; Path=/; HttpOnly; SameSite=Lax").arg(kCookieName, token);
 	emit logMessage(tr("Login OK: %1").arg(username));
 	return redirect("/", cookie);
+}
+
+void SubmissionServer::setLoginRateLimit(int maxFailures, int windowSeconds) {
+	loginMaxFailures_ = qMax(1, maxFailures);
+	loginWindowSeconds_ = qMax(1, windowSeconds);
+}
+
+bool SubmissionServer::loginAttemptAllowed(const QString &ip) {
+	const auto now = QDateTime::currentDateTime();
+	auto it = loginThrottle_.find(ip);
+	if (it == loginThrottle_.end())
+		return true;
+	if (it->windowStart.secsTo(now) >= loginWindowSeconds_) {
+		loginThrottle_.erase(it);
+		return true;
+	}
+	return it->failures < loginMaxFailures_;
+}
+
+void SubmissionServer::recordLoginFailure(const QString &ip) {
+	const auto now = QDateTime::currentDateTime();
+	auto it = loginThrottle_.find(ip);
+	if (it == loginThrottle_.end() || it->windowStart.secsTo(now) >= loginWindowSeconds_) {
+		loginThrottle_.insert(ip, LoginThrottle{1, now});
+	} else {
+		++it->failures;
+	}
+	if (loginThrottle_.size() > 1024)
+		pruneLoginThrottle();
+}
+
+void SubmissionServer::clearLoginFailures(const QString &ip) { loginThrottle_.remove(ip); }
+
+void SubmissionServer::pruneLoginThrottle() {
+	const auto now = QDateTime::currentDateTime();
+	for (auto it = loginThrottle_.begin(); it != loginThrottle_.end();) {
+		if (it->windowStart.secsTo(now) >= loginWindowSeconds_)
+			it = loginThrottle_.erase(it);
+		else
+			++it;
+	}
 }
 
 QHttpServerResponse SubmissionServer::handleLogout(const QHttpServerRequest &req) {

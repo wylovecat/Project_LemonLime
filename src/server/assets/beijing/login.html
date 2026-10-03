@@ -73,9 +73,14 @@
   </aside>
 
   <script>
-    if (new URLSearchParams(location.search).has('err')) {
+    const params = new URLSearchParams(location.search);
+    if (params.has('err')) {
       const e = document.getElementById('err');
-      if (e) e.hidden = false;
+      if (e) {
+        if (params.get('err') === 'rate')
+          e.textContent = '登录尝试过于频繁，请稍后再试';
+        e.hidden = false;
+      }
     }
   </script>
 </body>

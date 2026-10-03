@@ -69,4 +69,5 @@
 - 默认监听 `0.0.0.0`：对整个局域网暴露。若机房有别人的电脑也能访问，请改绑特定网卡，或配合机房交换机/防火墙做隔离
 - Cookie 用 `HttpOnly; SameSite=Lax`，但**没有** `Secure` 标志（因为是 HTTP）。若机房 Wi-Fi 不可信，建议有线接入，或后续启用 HTTPS
 - 单次提交限制：默认 64 KB，可在 `SubmissionServer::setMaxSourceBytes` 调整
-- 没有限速 / 反爆破：班级规模不需要；如需对外开放再加 `QHash<IP, count>` 滑窗
+- 登录限速：默认每个 IP 在 5 分钟内最多失败 10 次，超出后拒绝登录直到窗口结束（提示"登录尝试过于频繁"）。可用 `SubmissionServer::setLoginRateLimit(maxFailures, windowSeconds)` 调整。登录失败不做延时，避免阻塞该 HTTP 服务的事件循环
+- 用户名枚举：`UserStore::verify` 对不存在的用户名同样执行一次 PBKDF2，避免用响应时间探测有效账号

@@ -11,6 +11,7 @@
 #include "server/UserStore.h"
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFile>
 #include <QJsonArray>
@@ -107,6 +108,10 @@ class TestServerSmoke : public QObject {
 	void testResubmissionOverwrites();
 	void testAuditLogWritten();
 	void testAutoJudgeSurvivesRapidSubmissions();
+	void testUnknownUserTimingComparable();
+	// Declared last: the throttle is per client IP and every test comes from
+	// loopback, so this one must not run before the logins above.
+	void testLoginRateLimited();
 };
 
 void TestServerSmoke::initTestCase() {
@@ -287,6 +292,58 @@ void TestServerSmoke::testAutoJudgeSurvivesRapidSubmissions() {
 	QVERIFY(QFile::exists(contestDir_.filePath(QStringLiteral("source/stu02/answer.cpp"))));
 	QVERIFY(server_->isRunning());
 	server_->setAutoJudge(false);
+}
+
+// Verifying an unknown username must cost about as much as a known one,
+// otherwise the response time reveals which accounts exist.
+void TestServerSmoke::testUnknownUserTimingComparable() {
+	auto *store = server_->userStore();
+	const auto elapsed = [store](const QString &user) {
+		QElapsedTimer t;
+		t.start();
+		store->verify(user, QStringLiteral("definitely-wrong"));
+		return t.nsecsElapsed();
+	};
+	// warm up (page faults, lazy allocations)
+	elapsed(QStringLiteral("stu01"));
+	elapsed(QStringLiteral("no-such-user"));
+
+	qint64 known = 0;
+	qint64 unknown = 0;
+	for (int i = 0; i < 3; ++i) {
+		known += elapsed(QStringLiteral("stu01"));
+		unknown += elapsed(QStringLiteral("no-such-user"));
+	}
+	QVERIFY2(known > 0, "known-user verification did not take measurable time");
+	QVERIFY2(unknown * 10 >= known * 3,
+	         qPrintable(QStringLiteral("unknown=%1ns vs known=%2ns: timing leaks account existence")
+	                        .arg(unknown)
+	                        .arg(known)));
+}
+
+void TestServerSmoke::testLoginRateLimited() {
+	server_->setLoginRateLimit(3, 300);
+	// Clear any failures recorded by earlier tests with a successful login.
+	QVERIFY(loginAndGetCookie(QStringLiteral("stu01"), password1_).startsWith(QStringLiteral("lemon_sid=")));
+
+	const auto attempt = [this](const QString &password) {
+		const auto body = QStringLiteral("username=stu01&password=%1").arg(password).toUtf8();
+		return http(QStringLiteral("POST"), QStringLiteral("/login"), "application/x-www-form-urlencoded",
+		            body, QStringLiteral("none"));
+	};
+	for (int i = 0; i < 3; ++i) {
+		const auto r = attempt(QStringLiteral("wrong"));
+		QCOMPARE(r.status, 303);
+		QVERIFY(QUrl(QString::fromUtf8(r.location)).path() == QStringLiteral("/login"));
+		QVERIFY(! QUrl(QString::fromUtf8(r.location)).query().contains(QStringLiteral("err=rate")));
+	}
+	// The limit is reached: even the correct password is refused now.
+	const auto blocked = attempt(password1_);
+	QCOMPARE(blocked.status, 303);
+	QVERIFY(QUrl(QString::fromUtf8(blocked.location)).query().contains(QStringLiteral("err=rate")));
+	QVERIFY2(blocked.setCookie.isEmpty(), "a blocked login must not hand out a session cookie");
+
+	server_->setLoginRateLimit(10, 300);
 }
 
 QTEST_GUILESS_MAIN(TestServerSmoke)

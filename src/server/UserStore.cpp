@@ -154,17 +154,23 @@ bool UserStore::saveToContestDir(const QString &contestDir) const {
 }
 
 bool UserStore::verify(const QString &username, const QString &password) const {
+	// An unknown username must cost the same as a known one, otherwise the
+	// response time leaks which usernames exist. Hash against a throwaway salt
+	// and compare against a hash that can never match.
+	static const QByteArray dummySalt(16, '\x5a');
+	static const QByteArray dummyHash(32, '\x00');
 	const auto it = users_.constFind(username);
-	if (it == users_.constEnd())
-		return false;
-	const auto h = pbkdf2(password, it->salt, it->iterations);
-	if (h.size() != it->passwordHash.size())
+	const bool known = it != users_.constEnd();
+	const auto salt = known ? it->salt : dummySalt;
+	const auto expected = known ? it->passwordHash : dummyHash;
+	const auto h = pbkdf2(password, salt, known ? it->iterations : 100000);
+	if (h.size() != expected.size())
 		return false;
 	// constant-time compare
 	int diff = 0;
 	for (int i = 0; i < h.size(); ++i)
-		diff |= (h[i] ^ it->passwordHash[i]);
-	return diff == 0;
+		diff |= (h[i] ^ expected[i]);
+	return known && diff == 0;
 }
 
 bool UserStore::exists(const QString &username) const { return users_.contains(username); }
