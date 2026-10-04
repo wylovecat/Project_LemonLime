@@ -9,13 +9,20 @@ on:
       - "BUILD.md"
   # pull_request时触发workflow
   pull_request:
-    # 忽略README.md
     paths-ignore:
       - "README.md"
       - "LICENSE"
       - "BUILD.md"
+  # 发布 release 时，Release 变体额外产出并上传便携包
   release:
     types: [published]
+  # 手动补跑打包：把便携包重新传到指定 tag（不改动源码）
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to upload the portable package to (for example 0.3.7.1)
+        required: true
+        type: string
 
 # The release job uploads the packaged zip to the tag via GITHUB_TOKEN; the
 # repository default is a read-only token, so ask for write access explicitly.
@@ -41,14 +48,20 @@ jobs:
       targetName: lemon.exe
     # 步骤
     steps:
-      - name: Get the version
-        id: get_version
-        shell: bash
-        run: echo "VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_OUTPUT
       - name: Checking out sources
         uses: actions/checkout@v6
         with:
           submodules: "recursive"
+      - name: Resolve version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ inputs.tag }}" >> "$GITHUB_ENV"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            echo "VERSION=${{ github.event.release.tag_name }}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=dev" >> "$GITHUB_ENV"
+          fi
       - name: Install Python 3.12 version
         uses: actions/setup-python@v6
         with:
@@ -101,34 +114,40 @@ jobs:
           QT_FORCE_STDERR_LOGGING: 1
         run: |
           ctest --test-dir . -V --timeout 120
-      - name: package
-        env:
-          archiveName: lemon.${{ steps.get_version.outputs.VERSION }}.Windows-${{ matrix.arch }}
-        shell: pwsh
+      # The portable bundle is a release product: build it for Release only, so the
+      # other legs stay plain build+test runs. cmake/platforms/windows.cmake owns the
+      # layout (lemon.exe + Qt runtime + MSVC runtime + `portable` marker).
+      - name: Package portable bundle
+        if: matrix.build_type == 'Release'
+        shell: bash
+        run: cmake --build . --target windows-portable --parallel $(nproc)
+      - name: Prepare release assets
+        if: matrix.build_type == 'Release'
+        shell: bash
         run: |
-          # 创建文件夹
-          New-Item -ItemType Directory ${{ env.archiveName }}
-          # 拷贝exe
-          Copy-Item ${{ env.targetName }} ${{ env.archiveName}}\
-          # 拷贝依赖
-          windeployqt --qmldir . ${{ env.archiveName }}\${{ env.targetName }}
-          # 打包zip
-          Compress-Archive -Path ${{ env.archiveName }} ${{ env.archiveName }}'.zip'
+          # Rename to the published asset convention. The version is read back from the
+          # artifact the packaging target produced, so this step does not depend on the
+          # tag being resolvable (it also runs on ordinary pushes).
+          src=$(ls portable/lemon-*-Windows-*-portable.zip)
+          version=$(basename "$src" | sed -E 's/^lemon-(.*)-Windows-.*-portable\.zip$/\1/')
+          asset="LemonLime-${version}-windows-qt6-${{ matrix.arch }}.zip"
+          mkdir -p release-assets
+          cp "$src" "release-assets/$asset"
+          (cd release-assets && sha256sum "$asset" > "$asset.sha256")
+          echo "release asset: $asset"
+          cat "release-assets/$asset.sha256"
       - name: Upload artifact
+        if: matrix.build_type == 'Release'
         uses: actions/upload-artifact@v7
-        env:
-          archiveName: lemon.${{ steps.get_version.outputs.VERSION }}.Windows-${{ matrix.arch }}
         with:
-          name: lemon-win-qt6-x64-${{ matrix.build_type }}.zip
-          path: ${{ env.archiveName }}.zip
-      - name: uploadRelease
-        if: startsWith(github.event.ref, 'refs/tags/')
+          name: LemonLime-windows-qt6-x64-portable-${{ matrix.build_type }}
+          path: release-assets/*
+      - name: Upload portable package to release
+        if: matrix.build_type == 'Release' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
         uses: svenstaro/upload-release-action@v2
-        env:
-          archiveName: lemon.${{ steps.get_version.outputs.VERSION }}.Windows-${{ matrix.arch }}
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./${{ env.archiveName }}.zip
-          asset_name: lemon-win-qt6-x64-${{ matrix.build_type }}.zip
-          tag: ${{ github.ref }}
+          file: release-assets/*
+          file_glob: true
+          tag: ${{ env.VERSION }}
           overwrite: true

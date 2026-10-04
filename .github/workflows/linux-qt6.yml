@@ -10,19 +10,30 @@ on:
       - "BUILD.md"
   # pull_request时触发workflow
   pull_request:
-    # 忽略README.md
     paths-ignore:
       - "README.md"
       - "LICENSE"
       - "BUILD.md"
+  # 发布 release 时，Release 变体额外产出并上传便携包
+  release:
+    types: [published]
+  # 手动补跑打包：把便携包重新传到指定 tag（不改动源码）
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to upload the portable package to (for example 0.3.7.1)
+        required: true
+        type: string
 
-# Coverage-only job: it uploads no artifacts, so it does not run on releases.
-#
-# The linux-static-qt6 workflow has to build with -DENABLE_ONLINE_SERVER=OFF
-# because its static Qt is compiled without the HttpServer module. This job
-# uses the shared Qt build from the online installer instead, so the embedded
-# online submission service is compiled and its server-smoke test actually
-# runs on Linux.
+# The Release leg uploads the portable package to the tag via GITHUB_TOKEN; the
+# repository default is a read-only token, so ask for write access explicitly.
+permissions:
+  contents: write
+
+# This job owns the Linux release artifact. It uses the shared Qt build from the
+# online installer, because the embedded online submission service needs the
+# HttpServer module; linux-static-qt6.yml has to build with -DENABLE_ONLINE_SERVER=OFF
+# (its static Qt has no HttpServer) and therefore cannot produce the release package.
 jobs:
   build:
     name: Linux ${{ matrix.build_type }}
@@ -36,6 +47,16 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: "recursive"
+      - name: Resolve version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ inputs.tag }}" >> "$GITHUB_ENV"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            echo "VERSION=${{ github.event.release.tag_name }}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=dev" >> "$GITHUB_ENV"
+          fi
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -61,9 +82,13 @@ jobs:
           modules: "qthttpserver qtwebsockets"
       - name: Build
         run: |
+          # CMAKE_INSTALL_RPATH is what makes the portable package self-contained:
+          # the installed binary resolves Qt from the bundle's own lib/ directory.
+          # cmake/deploy-linux.cmake refuses to package a tree configured without it.
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DCMAKE_INSTALL_RPATH='$ORIGIN/../lib' \
             -DLEMON_BUILD_INFO="Build for Linux" \
             -DLEMON_BUILD_EXTRA_INFO="Build on $(uname -sr)"
           cmake --build build --parallel $(nproc)
@@ -75,3 +100,25 @@ jobs:
           # permitted"), so every judging case would error out. Judging is
           # covered by the static-Qt workflow, whose older image allows it.
           ctest --test-dir build -R server-smoke --output-on-failure --timeout 120
+      # The portable bundle is a release product: build it for Release only, so the
+      # Debug leg stays a plain coverage run.
+      - name: Package portable bundle
+        if: matrix.build_type == 'Release'
+        run: cmake --build build --target linux-portable --parallel $(nproc)
+      - name: Upload artifact
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@v7
+        with:
+          name: LemonLime-linux-qt6-x86_64-portable
+          path: |
+            build/portable/*.tar.gz
+            build/portable/*.tar.gz.sha256
+      - name: Upload portable package to release
+        if: matrix.build_type == 'Release' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/portable/LemonLime-*-linux-qt6-x86_64.tar.gz*
+          file_glob: true
+          tag: ${{ env.VERSION }}
+          overwrite: true
