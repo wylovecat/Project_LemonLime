@@ -198,8 +198,12 @@ file(WRITE "${LEMON_OUTPUT_DIR}/README.txt"
 # ----------------------------------------------------------------------------------
 # 6. Sanity check
 # ----------------------------------------------------------------------------------
+# LD_LIBRARY_PATH outranks RUNPATH, so it has to be cleared first: CI sets it to the
+# Qt installation (install-qt-action), and with it set ldd resolves Qt from there and
+# reports a bundle that looks broken while it is in fact fine. Users do not have it
+# set, so the cleanup is what reproduces their environment.
 execute_process(
-    COMMAND ldd "${_installed_binary}"
+    COMMAND env -u LD_LIBRARY_PATH ldd "${_installed_binary}"
     RESULT_VARIABLE _check_status
     OUTPUT_VARIABLE _check_out
     ERROR_QUIET)
