@@ -81,7 +81,10 @@ jobs:
           name: ${{ env.targetName }}-Qt${{ matrix.qt_ver }}-${{ matrix.build_type }}-${{ matrix.arch }}.dmg
           path: ${{ env.targetName }}.dmg
       - name: uploadRelease
-        if: startsWith(github.event.ref, 'refs/tags/')
+        # Only the Release dmg is published: the matrix spans three build types and
+        # two architectures, and shipping Debug/RelWithDebInfo builds to users only
+        # adds noise to the release.
+        if: matrix.build_type == 'Release' && startsWith(github.event.ref, 'refs/tags/')
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
