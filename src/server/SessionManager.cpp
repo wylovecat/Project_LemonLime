@@ -12,6 +12,23 @@ SessionManager::SessionManager(QObject *parent) : QObject(parent) {}
 
 QString SessionManager::createSession(const QString &username) {
 	purgeExpired();
+	// Hold at most kMaxSessionsPerUser live sessions per user; drop the least recently
+	// used one (the earliest expiry, since validate() extends it on access).
+	QString oldestToken;
+	QDateTime oldestExpiry;
+	int count = 0;
+	for (auto it = sessions_.constBegin(); it != sessions_.constEnd(); ++it) {
+		if (it->username != username)
+			continue;
+		++count;
+		if (! oldestExpiry.isValid() || it->expiresAt < oldestExpiry) {
+			oldestExpiry = it->expiresAt;
+			oldestToken = it.key();
+		}
+	}
+	if (count >= kMaxSessionsPerUser && ! oldestToken.isEmpty())
+		sessions_.remove(oldestToken);
+
 	QByteArray buf(32, Qt::Uninitialized);
 	auto *gen = QRandomGenerator::system();
 	for (int i = 0; i < buf.size(); ++i)

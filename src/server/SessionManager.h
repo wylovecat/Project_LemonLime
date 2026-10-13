@@ -30,6 +30,9 @@ class SessionManager : public QObject {
 	};
 	QHash<QString, Session> sessions_;
 	int ttlSeconds_ = 6 * 60 * 60; // 6 hours
+	// Sliding expiry means an active session never ages out, so cap the number of live
+	// sessions per user to keep repeated logins from growing the table without bound.
+	static constexpr int kMaxSessionsPerUser = 8;
 
 	void purgeExpired();
 };

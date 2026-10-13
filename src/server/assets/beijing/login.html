@@ -78,7 +78,7 @@
       const e = document.getElementById('err');
       if (e) {
         if (params.get('err') === 'rate')
-          e.textContent = '登录尝试过于频繁，请稍后再试';
+          e.textContent = '登录失败次数过多，本网络出口已被暂时限制登录（同一机房可能共用出口 IP，其他同学的失败尝试也会影响你）。请稍等几分钟后重试，或联系监考老师。';
         e.hidden = false;
       }
     }

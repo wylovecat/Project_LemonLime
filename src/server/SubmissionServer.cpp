@@ -89,6 +89,19 @@ namespace {
 		}
 		return out;
 	}
+
+	// A user name or a task's source file name is used as a single path component under
+	// <contestDir>/source/. Reject separators, drive letters and ".." so a mistyped
+	// configuration cannot make a submission escape that directory.
+	bool isSafePathComponent(const QString &name) {
+		if (name.isEmpty() || name == QLatin1String(".") || name == QLatin1String(".."))
+			return false;
+		if (name.contains(QLatin1Char('/')) || name.contains(QLatin1Char('\\')))
+			return false;
+		if (name.contains(QLatin1Char(':')) || name.contains(QLatin1Char('\0')))
+			return false;
+		return true;
+	}
 } // namespace
 
 SubmissionServer::SubmissionServer(QObject *parent) : QObject(parent) {
@@ -572,6 +585,8 @@ QHttpServerResponse SubmissionServer::handleApiSource(qint32 taskId, const QHttp
 	const auto *task = taskList.at(taskId);
 	const auto srcDir = QDir(QDir(contestDir_).filePath(QStringLiteral("source/%1").arg(user)));
 	const auto base = task->getSourceFileName();
+	if (! isSafePathComponent(user) || ! isSafePathComponent(base))
+		return jsonError(400, tr("Invalid task or user name"));
 	const QString folder = task->getSubFolderCheck() ? base + QChar('/') : QString();
 
 	QString bestPath;
@@ -626,11 +641,21 @@ bool SubmissionServer::writeSubmission(const QString &username, int taskIndex, c
                                        const QString &extension, QString *errOut) {
 	if (! contest_)
 		return false;
+	if (! isSafePathComponent(username)) {
+		if (errOut)
+			*errOut = tr("Invalid user name");
+		return false;
+	}
 	const auto *task = contest_->getTaskList().at(taskIndex);
 	const auto base = task->getSourceFileName();
 	if (base.isEmpty()) {
 		if (errOut)
 			*errOut = tr("Task %1 has empty source file name").arg(taskIndex);
+		return false;
+	}
+	if (! isSafePathComponent(base)) {
+		if (errOut)
+			*errOut = tr("Task %1 has an invalid source file name").arg(taskIndex);
 		return false;
 	}
 
