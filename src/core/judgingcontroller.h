@@ -31,7 +31,12 @@ class JudgingController : public QObject {
 	QQueue<TaskJudger *> queuingTasks;
 	QMap<TaskJudger *, QThread *> runningTasks;
 	bool isJudging;
+	// Settings::getMaxJudgingThreads(): the total number of test cases that may be
+	// judged at the same time, split into maxThreads tasks in flight and caseWorkers
+	// cases per task.
+	int maxJudgingThreads;
 	int maxThreads;
+	int caseWorkers;
 	bool preventSleepWhileJudging;
 	std::unique_ptr<SleepInhibitor> sleepInhibitor;
   public slots:

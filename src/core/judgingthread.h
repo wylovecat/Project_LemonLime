@@ -50,7 +50,15 @@ class JudgingThread : public QThread {
 	ResultState getResult() const;
 	const QString &getMessage() const;
 	bool getNeedRejudge() const;
+	// Request the running child to stop. Safe to call from another thread while
+	// judgeNow() is blocked waiting for the process; the flag is picked up by the
+	// process runner.
+	void stop();
 	void run();
+	// Judge on the calling thread.  The TaskJudger worker pool and the rejudge rounds
+	// call this instead of start(): the pool already supplies the concurrency, and a
+	// caller that waits for a child thread it has just started gains nothing by it.
+	void judgeNow();
 
   private:
 	// bool checkRejudgeMode;
@@ -77,7 +85,11 @@ class JudgingThread : public QThread {
 	qint64 memoryUsed;
 	int score{};
 	int judgedTimes;
-	ResultState result;
+	// LastResultState means "no verdict yet".  CorrectAnswer is enumerator 0, so a
+	// default-initialised ResultState would silently claim a correct answer on the
+	// paths that return before assigning one (e.g. compareWithDiff() giving up
+	// because judging was stopped).
+	ResultState result{LastResultState};
 	QString message;
 	std::atomic<bool> stopJudging{false};
 	bool interpreterAsWatcher{};

@@ -18,6 +18,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QProcess>
 #include <QRegularExpression>
 #include <QTextStream>
 #include <QTime>
@@ -79,6 +80,8 @@ void JudgingThread::setMemoryLimit(int limit) { memoryLimit = limit; }
 void JudgingThread::setRawMemoryLimit(int limit) { rawMemoryLimit = limit; }
 
 void JudgingThread::setInterpreterAsWatcher(bool use) { interpreterAsWatcher = use; }
+
+void JudgingThread::stop() { stopJudging = true; }
 
 void JudgingThread::setSandboxConfiguration(const SandboxSettings &settings, const QString &executable,
                                             const QProcessEnvironment &environment,
@@ -254,7 +257,7 @@ void JudgingThread::compareLineByLine(const QString &contestantOutput) {
 			return;
 		}
 
-		if (! standardOutputReader.eof() && contestantReader.eof()) {
+		if (standardOutputReader.eof() && ! contestantReader.eof()) {
 			score = 0;
 			result = OutputLimitExceeded;
 			message =
@@ -322,7 +325,7 @@ void JudgingThread::compareIgnoreSpaces(const QString &contestantOutput) {
 				return;
 			}
 
-			if (standardOutputLine.size() == 0 && ! standardOutputReader.eof() && contestantReader.eof()) {
+			if (standardOutputLine.size() == 0 && standardOutputReader.eof() && ! contestantReader.eof()) {
 				score = 0;
 				result = OutputLimitExceeded;
 				message = tr(R"(On line %1, Contestant's output has too much contents)")
@@ -350,7 +353,42 @@ void JudgingThread::compareWithDiff(const QString &contestantOutput) {
 	    (QStringList(task->getDiffArguments())
 	     << QFileInfo(outputFile).absoluteFilePath().replace('/', QDir::separator()) << contestantOutput);
 
-	if (QProcess::execute(cmd, cmdArgs) != 0) {
+	// Bound the external comparator the same way the special judges are bounded: a hung
+	// tool must not stall the judging thread forever.
+	const int timeLimitMs = specialJudgeTimeLimit > 0 ? specialJudgeTimeLimit : 10000;
+	QProcess diff;
+	diff.start(cmd, cmdArgs);
+	if (! diff.waitForStarted(-1)) {
+		score = 0;
+		result = FileError;
+		message = tr("Cannot start the output comparator");
+		return;
+	}
+
+	QElapsedTimer timer;
+	timer.start();
+	bool finished = false;
+	while (timer.elapsed() < timeLimitMs) {
+		if (diff.waitForFinished(10)) {
+			finished = true;
+			break;
+		}
+		QCoreApplication::processEvents();
+		if (stopJudging) {
+			diff.kill();
+			return;
+		}
+	}
+
+	if (! finished) {
+		diff.kill();
+		score = 0;
+		result = FileError;
+		message = tr("The output comparator did not finish in time");
+		return;
+	}
+
+	if (diff.exitCode() != 0) {
 		score = 0;
 		result = WrongAnswer;
 	} else {
@@ -561,6 +599,10 @@ void JudgingThread::lemonSpecialJudge(const QString &fileName) {
 		return;
 	}
 
+	// A buggy or malicious checker must not be able to award more than the task's
+	// full score; clamp before the score is written to the result table.
+	score = qMin(score, fullScore);
+
 	if (messageFile.open(QFile::ReadOnly)) {
 		QTextStream messageStream(&messageFile);
 		message = messageStream.readAll();
@@ -686,6 +728,10 @@ void JudgingThread::testlibSpecialJudge(const QString &fileName) {
 		result = InvalidSpecialJudge;
 		return;
 	}
+
+	// `points X` / `partially correct (N)` are untrusted checker output; clamp so a
+	// checker cannot award more than the task's full score.
+	score = qMin(score, fullScore);
 
 	if (score == 0)
 		result = WrongAnswer;
@@ -839,7 +885,9 @@ void JudgingThread::judgeAnswersOnlyTask() {
 	}
 }
 
-void JudgingThread::run() {
+void JudgingThread::run() { judgeNow(); }
+
+void JudgingThread::judgeNow() {
 	++judgedTimes;
 	needRejudge = false;
 

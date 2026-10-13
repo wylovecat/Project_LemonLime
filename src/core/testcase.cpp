@@ -133,6 +133,9 @@ int TestCase::readFromJson(const QJsonObject &in) {
 
 	QJsonArray inputFiles;
 	this->inputFiles.clear();
+	// readFromStream clears this too (see below); without it a second read of the
+	// same object keeps appending the dependence markers it parsed the first time.
+	dependenceSubtask.clear();
 	READ_JSON(in, inputFiles);
 	for (const auto &i : inputFiles) {
 		if (! i.isString())
