@@ -27,21 +27,39 @@ class JudgingCasesTest : public QObject {
 	QString m_fixtureDir;
 	QTemporaryDir m_tmpRoot;
 
-	// Four cases of one task.  Each case takes about a second of CPU, and the source
-	// picks its behaviour - and so its verdict, and its expected output - from the
-	// input file, which also makes a mixed-up per-case working directory visible.
+	// Four cases of one task.  Each case takes several seconds of wall-clock time, and
+	// the source picks its behaviour - and so its verdict, and its expected output -
+	// from the input file, which also makes a mixed-up per-case working directory
+	// visible.
 	static QByteArray busySource() {
-		return R"CPP(#include <chrono>
-#include <cstdio>
+		return R"CPP(#include <cstdio>
+
+#ifdef _WIN32
+#include <windows.h>
+#define LEMON_TEST_SLEEP_MS(ms) Sleep(ms)
+#else
+#include <unistd.h>
+#define LEMON_TEST_SLEEP_MS(ms) usleep((ms) * 1000)
+#endif
 
 int main() {
 	char word[64] = {0};
 	if (std::scanf("%63s", word) != 1)
 		return 0;
 
-	auto start = std::chrono::steady_clock::now();
-	while (std::chrono::steady_clock::now() - start < std::chrono::milliseconds(1000)) {
-	}
+	// A real sleep rather than a spin.  The fixture exists to show that the cases
+	// overlap in wall-clock time; a spin loop would instead measure how much CPU the
+	// host leaves to the judging processes, and a Debug host burns far more of it
+	// than a Release host, so the same assertion would pass or fail depending on the
+	// build type and on how many cores the runner really hands out.
+	//
+	// The sleep is deliberately much longer than the per-case overhead: a round also
+	// pays a fixed cost that cannot overlap (compiling the submission, preparing the
+	// working directories, starting the processes), and with one-second cases that
+	// fixed cost ate so much of the round that four cases running together came out
+	// barely 1.6 times faster than four cases run one after another - short of the
+	// two-fold this test asks for, on a Debug build with a loaded machine.
+	LEMON_TEST_SLEEP_MS(4000);
 
 	if (word[0] == 'R')
 		return 2; // run time error
@@ -236,9 +254,10 @@ int main() {
 	}
 
 	void testIndependentCasesRunInParallel() {
-		if (QThread::idealThreadCount() < 4)
-			QSKIP("needs at least four usable cores to show a speed-up");
-
+		// No core-count guard is needed: the fixture sleeps instead of spinning, so
+		// this measures overlap in wall-clock time and not throughput.  Sleeping cases
+		// overlap on any machine, however few cores the runner hands out, while a
+		// budget that failed to reach the cases still shows up as parallel == serial.
 		const QString serialDir = buildBusyFixture("busy-serial");
 		QVERIFY2(! serialDir.isEmpty(), "could not build the serial fixture");
 
@@ -259,8 +278,8 @@ int main() {
 
 		qInfo("busy fixture: serial %lld ms, parallel %lld ms", serialMs, parallelMs);
 
-		// Four one-second cases: running them one after another cannot be faster than
-		// running them together.
+		// Four multi-second cases: running them one after another cannot be faster
+		// than running them together.
 		QVERIFY2(serialMs > 2000, qPrintable(QString("the serial round only took %1 ms, too short to "
 		                                             "compare")
 		                                         .arg(serialMs)));
