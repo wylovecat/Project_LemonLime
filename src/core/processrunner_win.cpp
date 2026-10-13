@@ -70,7 +70,7 @@ ProcessRunnerResult WinProcessRunner::run() {
 	if (config.standardInputCheck) {
 		siex.StartupInfo.hStdInput = CreateFileW((const WCHAR *)(config.inputFile.utf16()), GENERIC_READ,
 		                                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &sa,
-		                                         OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		                                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	}
 
 	if (config.standardOutputCheck) {
@@ -214,12 +214,22 @@ ProcessRunnerResult WinProcessRunner::run() {
 	SYSTEMTIME realUserTime, realKernelTime;
 	FileTimeToSystemTime(&userTime, &realUserTime);
 	FileTimeToSystemTime(&kernelTime, &realKernelTime);
+	// Reported time is user CPU time by design (the Windows test asserts it against
+	// GetProcessTimes' user ticks); the loop above enforces the limit on wall clock.
 	res.timeUsed = realUserTime.wMilliseconds + realUserTime.wSecond * 1000 +
 	               realUserTime.wMinute * 60 * 1000 + realUserTime.wHour * 60 * 60 * 1000;
 	int kernelTimeUsed = realKernelTime.wMilliseconds + realKernelTime.wSecond * 1000 +
 	                     realKernelTime.wMinute * 60 * 1000 + realKernelTime.wHour * 60 * 60 * 1000;
 	GetProcessMemoryInfo(pi.hProcess, (PROCESS_MEMORY_COUNTERS *)&memoryInfo, sizeof(memoryInfo));
 	res.memoryUsed = memoryInfo.PeakWorkingSetSize;
+	// PeakWorkingSetSize is a high-water mark, so this catches a submission that peaked
+	// above the limit between two 10ms samples and exited before it could be terminated.
+	if (config.memoryLimit != -1 && res.memoryUsed > 1ll * config.memoryLimit * 1024 * 1024) {
+		res.score = 0;
+		res.result = MemoryLimitExceeded;
+		res.timeUsed = -1;
+		return res;
+	}
 	if (sandbox) {
 		const QDir work(config.workingDirectory);
 		const auto outputPath =

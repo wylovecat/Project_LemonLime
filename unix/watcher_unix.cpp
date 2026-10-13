@@ -32,6 +32,30 @@ extern ssize_t calculateStaticMemoryUsage(const std::string &);
 extern ssize_t getMemoryRLimit(ssize_t memoryLimitInMB);
 extern size_t getMaxRSSInByte(long ru_maxrss);
 
+namespace {
+	// The child's stderr was redirected to `path`. An over-limit allocation fails before
+	// it can grow RSS or address space, so usage numbers cannot identify it; the runtime
+	// diagnostic names it instead. Only used to separate a blocked allocation from an
+	// ordinary crash.
+	bool stderrNamesFailedAllocation(const std::string &path) {
+		if (path.empty())
+			return false;
+		FILE *f = fopen(path.c_str(), "rb");
+		if (f == nullptr)
+			return false;
+		std::string buffer;
+		char chunk[4096];
+		size_t count = 0;
+		while ((count = fread(chunk, 1, sizeof(chunk), f)) > 0) {
+			buffer.append(chunk, count);
+			if (buffer.size() > (1u << 16))
+				break; // diagnostics are short; bound the read
+		}
+		fclose(f);
+		return buffer.find("bad_alloc") != std::string::npos;
+	}
+} // namespace
+
 enum : int {
 	RS_AC = 0,
 	RS_FAIL = 1,
@@ -114,6 +138,7 @@ auto main(int argc, char *argv[]) -> int {
 		}
 
 		if (WIFEXITED(status)) {
+			// Reported time is user CPU time, matching the judge's displayed metric.
 			long long timeUsedMs =
 			    static_cast<long long>(usage.ru_utime.tv_sec * 1000 + usage.ru_utime.tv_usec / 1000);
 			size_t memoryUsed = getMaxRSSInByte(usage.ru_maxrss);
@@ -134,11 +159,18 @@ auto main(int argc, char *argv[]) -> int {
 		if (WIFSIGNALED(status)) {
 			long long timeUsedMs =
 			    static_cast<long long>(usage.ru_utime.tv_sec * 1000 + usage.ru_utime.tv_usec / 1000);
-			printf("%lld\n-1\n", timeUsedMs);
+			size_t memoryUsed = getMaxRSSInByte(usage.ru_maxrss);
+			printf("%lld\n%zu\n", timeUsedMs, memoryUsed);
 			if (WTERMSIG(status) == SIGXCPU) {
 				return RS_TLE;
 			}
-			if (WTERMSIG(status) == SIGKILL || WTERMSIG(status) == SIGABRT) {
+			// RLIMIT_AS turns an over-limit allocation into an uncaught std::bad_alloc,
+			// which reaches here as SIGABRT -- but so do assert() and every other uncaught
+			// exception, and the usage numbers cannot separate them because the allocation
+			// fails before RSS or address space grows. The child's own diagnostic can:
+			// only a blocked allocation names bad_alloc. Everything else is a real crash.
+			if (WTERMSIG(status) == SIGABRT && memoryLimitMib > 0 &&
+			    stderrNamesFailedAllocation(stderrRedirect)) {
 				return RS_MLE;
 			}
 			return RS_RE;
