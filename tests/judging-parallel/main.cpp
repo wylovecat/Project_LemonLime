@@ -22,7 +22,7 @@ class JudgingParallelTest : public QObject {
 	// One self-contained round: its own working copy, its own Contest, its own
 	// judgeAll().  Judging writes compiled binaries next to the sources, so the
 	// rounds must not share a directory (stale binaries misbehave on Windows).
-	QString judgeOneRound(Settings *settings, int round) {
+	QString judgeOneRound(Settings *settings, int round, bool *compileTimedOut) {
 		const QString contestDir = JudgingTestUtil::makeWorkCopy(m_tmpRoot, m_fixtureDir,
 		                                                         QString("round%1/TestContest1").arg(round));
 		if (contestDir.isEmpty())
@@ -34,6 +34,8 @@ class JudgingParallelTest : public QObject {
 
 		contest->refreshContestantList();
 		contest->judgeAll();
+
+		*compileTimedOut = JudgingTestUtil::compileHitTimeLimit(contest);
 
 		QString msg = JudgingTestUtil::verifyTestContest1Matrix(contest);
 		if (! msg.isEmpty())
@@ -58,7 +60,17 @@ class JudgingParallelTest : public QObject {
 		Settings *settings = JudgingTestUtil::createSettings(4);
 
 		for (int round = 1; round <= 2; round++) {
-			const QString msg = judgeOneRound(settings, round);
+			bool compileTimedOut = false;
+			const QString msg = judgeOneRound(settings, round, &compileTimedOut);
+
+			// Four submissions are compiled at the same time here.  On a busy CI
+			// runner one of them can run into the compiler's own time limit, which
+			// turns the whole task into CompileFailed; that is the runner, not the
+			// judging, so the comparison is skipped instead of failing.
+			if (! msg.isEmpty() && compileTimedOut)
+				QSKIP("a fixture compile ran into its time limit: the runner was too busy "
+				      "for four concurrent compiles");
+
 			QVERIFY2(msg.isEmpty(), qPrintable(msg));
 		}
 

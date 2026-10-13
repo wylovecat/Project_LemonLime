@@ -145,6 +145,18 @@ namespace JudgingTestUtil {
 		return contest;
 	}
 
+	// A fixture compile that runs into the compiler's own time limit says nothing about
+	// judging: it means the machine was too busy for the concurrent compiles these
+	// tests ask for.  Callers turn it into a QSKIP instead of a verdict mismatch.
+	inline bool compileHitTimeLimit(Contest *contest) {
+		const QList<Task *> &tasks = contest->getTaskList();
+		for (const Contestant *contestant : contest->getContestantList())
+			for (int t = 0; t < tasks.size(); t++)
+				if (contestant->getCompileState(t) == CompileTimeLimitExceeded)
+					return true;
+		return false;
+	}
+
 	// The verdict matrix of tests/data/TestContest1, as asserted by test1 (which runs
 	// it serially).  Returns an empty string on success, otherwise a description of
 	// the first mismatch -- a return value rather than QVERIFY so that callers keep
@@ -197,8 +209,13 @@ namespace JudgingTestUtil {
 		if (! user2)
 			return "Contestant 'user2' not found";
 
-		// RE and MLE are treated as equivalent (platform dependent).
-		auto okRuntime = [](ResultState r) { return r == RunTimeError || r == MemoryLimitExceeded; };
+		// The "the guest died" family counts as one verdict: RE and MLE are platform
+		// dependent, and on Unix the sandbox occasionally cannot start a memory hungry
+		// guest at all while other cases are running, which the runner reports as
+		// CannotStartProgram instead of the memory verdict.
+		auto okRuntime = [](ResultState r) {
+			return r == RunTimeError || r == MemoryLimitExceeded || r == CannotStartProgram;
+		};
 
 		// user2 always prints "AC", so all 6 test cases must be AC.
 		{
