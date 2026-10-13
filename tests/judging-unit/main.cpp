@@ -55,8 +55,7 @@ class JudgingUnitTest : public QObject {
 		QCOMPARE(readBack.getInputFiles().size(), 1);
 		// writeToJson() stores '/' (testcase.cpp:111) and readFromJson() restores the
 		// native separator (testcase.cpp:145), so compare separator-insensitively.
-		QCOMPARE(QDir::fromNativeSeparators(readBack.getInputFiles().at(0)),
-		         original.getInputFiles().at(0));
+		QCOMPARE(QDir::fromNativeSeparators(readBack.getInputFiles().at(0)), original.getInputFiles().at(0));
 		QCOMPARE(readBack.getOutputFiles().size(), 1);
 	}
 

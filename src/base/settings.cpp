@@ -575,7 +575,8 @@ void Settings::loadSettings() {
 	// g++ plus the contestants' processes, i.e. all CPU) while still overlapping the
 	// jobs.  The user-facing setting overrides this, and its range is 1 to twice the
 	// core count.
-	maxJudgingThreads = settings.value("MaximumJudgingThreads", qMax(1, QThread::idealThreadCount() / 2)).toInt();
+	maxJudgingThreads =
+	    settings.value("MaximumJudgingThreads", qMax(1, QThread::idealThreadCount() / 2)).toInt();
 	preventSleepWhileJudging = settings.value("PreventSleepWhileJudging", true).toBool();
 	defaultInputFileExtension = settings.value("DefaultInputFileExtension", "in").toString();
 	defaultOutputFileExtension = settings.value("DefaultOutputFileExtension", "out").toString();

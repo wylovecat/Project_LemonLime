@@ -23,8 +23,8 @@ class JudgingParallelTest : public QObject {
 	// judgeAll().  Judging writes compiled binaries next to the sources, so the
 	// rounds must not share a directory (stale binaries misbehave on Windows).
 	QString judgeOneRound(Settings *settings, int round) {
-		const QString contestDir =
-		    JudgingTestUtil::makeWorkCopy(m_tmpRoot, m_fixtureDir, QString("round%1/TestContest1").arg(round));
+		const QString contestDir = JudgingTestUtil::makeWorkCopy(m_tmpRoot, m_fixtureDir,
+		                                                         QString("round%1/TestContest1").arg(round));
 		if (contestDir.isEmpty())
 			return QString("round %1: could not create a working copy").arg(round);
 

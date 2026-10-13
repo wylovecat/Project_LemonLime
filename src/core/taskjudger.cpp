@@ -462,7 +462,7 @@ int TaskJudger::judge() {
 		// initial maxDependValue - so it holds nothing up.  Without dependence (the
 		// common case) this makes one group out of the whole task, and all of its test
 		// cases can then run at once.
-		QList<int> group{ first };
+		QList<int> group{first};
 		int next = first + 1;
 		while (next < subtaskCount) {
 			bool blocked = false;
@@ -567,8 +567,8 @@ int TaskJudger::judge() {
 					message[i][j] = outcome.message;
 					overallStatus[i] = -1;
 					testCaseScore[i] = 0;
-					emit singleCaseFinished(contestantName, curTestCase->getTimeLimit(), i, j,
-					                        int(FileError), 0, timeUsed[i][j], memoryUsed[i][j]);
+					emit singleCaseFinished(contestantName, curTestCase->getTimeLimit(), i, j, int(FileError),
+					                        0, timeUsed[i][j], memoryUsed[i][j]);
 					continue;
 				}
 
@@ -632,9 +632,9 @@ void TaskJudger::judgeSingleCase(int subtask, int index, const QString &contesta
 	thread->setExtraTimeRatio(settings->getDefaultExtraTimeRatio());
 	thread->setWorkingDirectory(workingDirectory);
 	thread->setSandboxConfiguration(sandboxSettings, runtimeExecutable, runtimeEnvironment, sandboxSession);
-	QStringList entryList = QDir(QDir::toNativeSeparators(temporaryDir.path()) + QDir::separator() +
-	                             contestantName)
-	                            .entryList(QDir::Files);
+	QStringList entryList =
+	    QDir(QDir::toNativeSeparators(temporaryDir.path()) + QDir::separator() + contestantName)
+	        .entryList(QDir::Files);
 
 	for (int fileIdx = 0; fileIdx < entryList.size(); fileIdx++) {
 		QFile::copy(QDir::toNativeSeparators(temporaryDir.path()) + QDir::separator() + contestantName +

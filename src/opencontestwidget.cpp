@@ -97,9 +97,9 @@ void OpenContestWidget::refreshContestList() {
 }
 
 void OpenContestWidget::addContest() {
-	QString fileName = QFileDialog::getOpenFileName(this, tr("Add Contest"),
-	                                                Lemon::Portable::contestBrowseDirectory(),
-	                                                tr("Lemon contest data file (*.cdf)"));
+	QString fileName =
+	    QFileDialog::getOpenFileName(this, tr("Add Contest"), Lemon::Portable::contestBrowseDirectory(),
+	                                 tr("Lemon contest data file (*.cdf)"));
 
 	if (fileName.isEmpty())
 		return;
