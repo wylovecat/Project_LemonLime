@@ -10,6 +10,8 @@
 #include "newcontestwidget.h"
 #include "ui_newcontestwidget.h"
 //
+#include "base/LemonPortable.hpp"
+//
 #include <QFileDialog>
 
 NewContestWidget::NewContestWidget(QWidget *parent) : QWidget(parent), ui(new Ui::NewContestWidget) {
@@ -35,14 +37,15 @@ auto NewContestWidget::checkReady() const -> bool {
 }
 
 void NewContestWidget::selectContestPath() {
-	QString path = QFileDialog::getExistingDirectory(this, tr("Select Contest Path"), QDir::homePath());
+	QString path = QFileDialog::getExistingDirectory(this, tr("Select Contest Path"),
+	                                                 Lemon::Portable::contestBrowseDirectory());
 
 	if (! path.isEmpty())
 		ui->contestPath->setText(QDir::toNativeSeparators(path));
 }
 
 void NewContestWidget::savingNameChanged() {
-	QString path = QDir::homePath();
+	QString path = Lemon::Portable::contestBrowseDirectory();
 	path = QDir::toNativeSeparators(path);
 	path += QDir::separator();
 	path += ui->savingName->text();

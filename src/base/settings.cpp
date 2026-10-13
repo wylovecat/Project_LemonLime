@@ -18,6 +18,7 @@
 #include <QDir>
 #include <QLocale>
 #include <QSettings>
+#include <QThread>
 
 #define LEMON_MODULE_NAME "Setting"
 
@@ -567,7 +568,14 @@ void Settings::loadSettings() {
 	specialJudgeTimeLimit = settings.value("SpecialJudgeTimeLimit", 10000).toInt();
 	fileSizeLimit = settings.value("FileSizeLimit", 50).toInt();
 	rejudgeTimes = settings.value("MaximumRejudgeTimes", 1).toInt();
-	maxJudgingThreads = settings.value("MaximumJudgingThreads", 1).toInt();
+	// Judging a whole contest means one (contestant, task) job per competitor and
+	// task - 40 students with 4 tasks is 160 jobs - and JudgingController is able to
+	// run several of them at once.  The default used to be 1, which serialised all of
+	// them; half the logical cores keeps the machine responsive (a judge run is
+	// g++ plus the contestants' processes, i.e. all CPU) while still overlapping the
+	// jobs.  The user-facing setting overrides this, and its range is 1 to twice the
+	// core count.
+	maxJudgingThreads = settings.value("MaximumJudgingThreads", qMax(1, QThread::idealThreadCount() / 2)).toInt();
 	preventSleepWhileJudging = settings.value("PreventSleepWhileJudging", true).toBool();
 	defaultInputFileExtension = settings.value("DefaultInputFileExtension", "in").toString();
 	defaultOutputFileExtension = settings.value("DefaultOutputFileExtension", "out").toString();

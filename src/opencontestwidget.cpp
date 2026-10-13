@@ -12,6 +12,8 @@
 //
 #include "core/contest.h"
 //
+#include "base/LemonPortable.hpp"
+//
 #include <QByteArrayView>
 #include <QFileDialog>
 #include <QJsonDocument>
@@ -95,7 +97,8 @@ void OpenContestWidget::refreshContestList() {
 }
 
 void OpenContestWidget::addContest() {
-	QString fileName = QFileDialog::getOpenFileName(this, tr("Add Contest"), QDir::homePath(),
+	QString fileName = QFileDialog::getOpenFileName(this, tr("Add Contest"),
+	                                                Lemon::Portable::contestBrowseDirectory(),
 	                                                tr("Lemon contest data file (*.cdf)"));
 
 	if (fileName.isEmpty())

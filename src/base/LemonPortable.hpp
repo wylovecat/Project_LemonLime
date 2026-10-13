@@ -123,6 +123,25 @@ namespace Lemon::Portable {
 		       QLatin1String("/logs");
 	}
 
+	// Directory the contest file dialogs start in. A portable (green) copy is
+	// meant to be self-contained, so its contests live next to the executable -
+	// starting the browser at the host machine's home directory would scatter
+	// them outside the folder the user copied onto the stick. Outside portable
+	// mode the historical default (the home directory) is kept.
+	inline auto contestBrowseDirectory() -> QString {
+		if (! isEnabled())
+			return QDir::homePath();
+
+		// Prefer the conventional <appdir>/contests folder when the green copy
+		// ships one, so new contests do not end up next to the executable.
+		const QDir contests(appDir() + QLatin1String("/contests"));
+
+		if (contests.exists())
+			return contests.absolutePath();
+
+		return appDir();
+	}
+
 	// Directories a shipped compiler/toolchain may live in, e.g.
 	// <appdir>/compiler/mingw64/bin/g++.exe.
 	inline auto bundledToolDirectories() -> QStringList {
