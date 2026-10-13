@@ -85,6 +85,7 @@ class Settings {
 	int getFileSizeLimit() const;
 	int getRejudgeTimes() const;
 	int getMaxJudgingThreads() const;
+	bool getPreventSleepWhileJudging() const;
 	double getDefaultExtraTimeRatio() const;
 	const QString &getDefaultInputFileExtension() const;
 	const QString &getDefaultOutputFileExtension() const;
@@ -96,6 +97,7 @@ class Settings {
 	const QString &getUiLanguage() const;
 	const QString &getDiffPath() const;
 	int getSplashTime() const;
+	Qt::ColorScheme getColorScheme() const;
 
 	void setDefaultFullScore(int);
 	void setDefaultTimeLimit(int);
@@ -106,6 +108,7 @@ class Settings {
 	void setFileSizeLimit(int);
 	void setRejudgeTimes(int);
 	void setMaxJudgingThreads(int);
+	void setPreventSleepWhileJudging(bool);
 	void setDefaultInputFileExtension(const QString &);
 	void setDefaultOutputFileExtension(const QString &);
 	void setInputFileExtensions(const QString &);
@@ -113,6 +116,7 @@ class Settings {
 	void setRecentContest(const QStringList &);
 	void setUiLanguage(const QString &);
 	void setSplashTime(int);
+	void setColorScheme(Qt::ColorScheme);
 
 	void addCompiler(Compiler *);
 	void deleteCompiler(int);
@@ -154,6 +158,7 @@ class Settings {
 	int fileSizeLimit{};
 	int rejudgeTimes{};
 	int maxJudgingThreads{};
+	bool preventSleepWhileJudging = true;
 	double defaultExtraTimeRatio{};
 	QString defaultInputFileExtension;
 	QString defaultOutputFileExtension;
@@ -166,4 +171,5 @@ class Settings {
 	int currentColorTheme{};
 
 	int splashTime{};
+	Qt::ColorScheme colorScheme = Qt::ColorScheme::Unknown;
 };

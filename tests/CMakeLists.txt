@@ -6,4 +6,5 @@ endif()
 
 if(WIN32)
     add_subdirectory(windows-sandbox)
+    add_subdirectory(sleep-inhibitor)
 endif()

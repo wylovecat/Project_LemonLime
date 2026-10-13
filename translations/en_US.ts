@@ -1069,6 +1069,10 @@ Depends: </source>
 <context>
     <name>GeneralSettings</name>
     <message>
+        <source>Prevent system sleep while judging</source>
+        <translation>Prevent system sleep while judging</translation>
+    </message>
+    <message>
         <source>Form</source>
         <translation></translation>
     </message>
@@ -2569,6 +2573,10 @@ p, li { white-space: pre-wrap; }
 <context>
     <name>TaskJudger</name>
     <message>
+        <source>Cannot create testcase working directory: %1</source>
+        <translation>Cannot create testcase working directory: %1</translation>
+    </message>
+    <message>
         <source>Preparing...</source>
         <translation></translation>
     </message>
@@ -2698,6 +2706,22 @@ p, li { white-space: pre-wrap; }
 <context>
     <name>VisualMainSettings</name>
     <message>
+        <source>Dark</source>
+        <translation>Dark</translation>
+    </message>
+    <message>
+        <source>Light</source>
+        <translation>Light</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>System</translation>
+    </message>
+    <message>
+        <source>Appearance</source>
+        <translation>Appearance</translation>
+    </message>
+    <message>
         <source>Form</source>
         <translation></translation>
     </message>
@@ -2774,6 +2798,13 @@ p, li { white-space: pre-wrap; }
     <message>
         <source>New</source>
         <translation></translation>
+    </message>
+</context>
+<context>
+    <name>JudgingController</name>
+    <message>
+        <source>Judging submissions</source>
+        <translation>Judging submissions</translation>
     </message>
 </context>
 </TS>

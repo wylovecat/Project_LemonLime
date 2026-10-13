@@ -41,6 +41,7 @@
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QStatusBar>
+#include <QStyleHints>
 #include <QTextBrowser>
 #include <QUrl>
 #include <algorithm>
@@ -244,6 +245,7 @@ void LemonLime::showOptionsDialog() {
 
 	if (dialog->exec() == QDialog::Accepted) {
 		settings->copyFrom(dialog->getEditSettings());
+		QGuiApplication::styleHints()->setColorScheme(settings->getColorScheme());
 		LemonLimeTranslator->InstallTranslation(settings->getUiLanguage());
 		ui->testCaseEdit->setSettings(settings);
 

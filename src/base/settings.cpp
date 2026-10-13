@@ -125,6 +125,8 @@ auto Settings::getRejudgeTimes() const -> int { return rejudgeTimes; }
 
 auto Settings::getMaxJudgingThreads() const -> int { return maxJudgingThreads; }
 
+bool Settings::getPreventSleepWhileJudging() const { return preventSleepWhileJudging; }
+
 auto Settings::getDefaultExtraTimeRatio() const -> double { return defaultExtraTimeRatio; }
 
 auto Settings::getDefaultInputFileExtension() const -> const QString & { return defaultInputFileExtension; }
@@ -148,6 +150,8 @@ auto Settings::getUiLanguage() const -> const QString & { return uiLanguage; }
 auto Settings::getDiffPath() const -> const QString & { return diffPath; }
 
 auto Settings::getSplashTime() const -> int { return splashTime; }
+
+Qt::ColorScheme Settings::getColorScheme() const { return colorScheme; }
 
 void Settings::setDefaultFullScore(int score) {
 	defaultFullScore = score;
@@ -191,6 +195,20 @@ void Settings::setRejudgeTimes(int number) {
 void Settings::setMaxJudgingThreads(int number) {
 	maxJudgingThreads = number;
 	DEBUG("Set Max Judging Threads to " + QString::number(number));
+}
+
+void Settings::setPreventSleepWhileJudging(bool enabled) { preventSleepWhileJudging = enabled; }
+
+void Settings::setColorScheme(Qt::ColorScheme scheme) {
+	switch (scheme) {
+		case Qt::ColorScheme::Light:
+		case Qt::ColorScheme::Dark:
+			colorScheme = scheme;
+			break;
+		default:
+			colorScheme = Qt::ColorScheme::Unknown;
+			break;
+	}
 }
 
 void Settings::setDefaultInputFileExtension(const QString &extension) {
@@ -385,11 +403,13 @@ void Settings::copyFrom(Settings *other) {
 	setFileSizeLimit(other->getFileSizeLimit());
 	setRejudgeTimes(other->getRejudgeTimes());
 	setMaxJudgingThreads(other->getMaxJudgingThreads());
+	setPreventSleepWhileJudging(other->getPreventSleepWhileJudging());
 	setDefaultInputFileExtension(other->getDefaultInputFileExtension());
 	setDefaultOutputFileExtension(other->getDefaultOutputFileExtension());
 	setInputFileExtensions(other->getInputFileExtensions().join(";"));
 	setOutputFileExtensions(other->getOutputFileExtensions().join(";"));
 	setSplashTime(other->getSplashTime());
+	setColorScheme(other->getColorScheme());
 	setUiLanguage(other->getUiLanguage()); // 为什么这个没复制啊！！！// 草
 
 	for (auto &i : compilerList) {
@@ -434,6 +454,7 @@ void Settings::saveSettings() {
 	settings.setValue("FileSizeLimit", fileSizeLimit);
 	settings.setValue("MaximumRejudgeTimes", rejudgeTimes);
 	settings.setValue("MaximumJudgingThreads", maxJudgingThreads);
+	settings.setValue("PreventSleepWhileJudging", preventSleepWhileJudging);
 	settings.setValue("DefaultInputFileExtension", defaultInputFileExtension);
 	settings.setValue("DefaultOutputFileExtension", defaultOutputFileExtension);
 	settings.setValue("InputFileExtensions", inputFileExtensions);
@@ -441,6 +462,7 @@ void Settings::saveSettings() {
 	settings.endGroup();
 
 	settings.beginGroup("VisualSettings");
+	settings.setValue("ColorScheme", static_cast<int>(colorScheme));
 	settings.beginWriteArray("ColorThemes");
 	for (int i = 0; i < colorThemeList.size(); i++) {
 		settings.setArrayIndex(i);
@@ -546,6 +568,7 @@ void Settings::loadSettings() {
 	fileSizeLimit = settings.value("FileSizeLimit", 50).toInt();
 	rejudgeTimes = settings.value("MaximumRejudgeTimes", 1).toInt();
 	maxJudgingThreads = settings.value("MaximumJudgingThreads", 1).toInt();
+	preventSleepWhileJudging = settings.value("PreventSleepWhileJudging", true).toBool();
 	defaultInputFileExtension = settings.value("DefaultInputFileExtension", "in").toString();
 	defaultOutputFileExtension = settings.value("DefaultOutputFileExtension", "out").toString();
 	inputFileExtensions = settings.value("InputFileExtensions", QStringList() << "in").toStringList();
@@ -553,6 +576,7 @@ void Settings::loadSettings() {
 	    settings.value("OutputFileExtensions", QStringList() << "out" << "ans").toStringList();
 	settings.endGroup();
 	settings.beginGroup("VisualSettings");
+	setColorScheme(static_cast<Qt::ColorScheme>(settings.value("ColorScheme", 0).toInt()));
 
 	int themesCount = settings.beginReadArray("ColorThemes");
 	for (int i = 0; i < themesCount; i++) {

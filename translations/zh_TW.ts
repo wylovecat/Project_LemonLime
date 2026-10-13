@@ -1090,6 +1090,10 @@ Depends: </source>
 <context>
     <name>GeneralSettings</name>
     <message>
+        <source>Prevent system sleep while judging</source>
+        <translation>評測時阻止系統休眠</translation>
+    </message>
+    <message>
         <source>Form</source>
         <translation>Form</translation>
     </message>
@@ -2602,6 +2606,10 @@ p, li { white-space: pre-wrap; }
 <context>
     <name>TaskJudger</name>
     <message>
+        <source>Cannot create testcase working directory: %1</source>
+        <translation>無法建立測試點工作目錄：%1</translation>
+    </message>
+    <message>
         <source>Preparing...</source>
         <translation>準備中…</translation>
     </message>
@@ -2732,6 +2740,22 @@ p, li { white-space: pre-wrap; }
 <context>
     <name>VisualMainSettings</name>
     <message>
+        <source>Dark</source>
+        <translation>深色</translation>
+    </message>
+    <message>
+        <source>Light</source>
+        <translation>淺色</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>跟隨系統</translation>
+    </message>
+    <message>
+        <source>Appearance</source>
+        <translation>外觀模式</translation>
+    </message>
+    <message>
         <source>Form</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2808,6 +2832,13 @@ p, li { white-space: pre-wrap; }
     <message>
         <source>New</source>
         <translation>新建</translation>
+    </message>
+</context>
+<context>
+    <name>JudgingController</name>
+    <message>
+        <source>Judging submissions</source>
+        <translation>正在評測提交程式</translation>
     </message>
 </context>
 </TS>
