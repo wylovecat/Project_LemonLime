@@ -84,11 +84,17 @@ namespace {
 		                                                 : UNPROTECTED_DACL_SECURITY_INFORMATION),
 		                               nullptr, nullptr, acl, nullptr) == ERROR_SUCCESS;
 	}
+	// The system temp directory, not QDir::currentPath(): a temporary directory rooted at
+	// the directory ctest ran in left sandbox-tests-XXXXXX folders behind on every run.
+	QString temporaryDirectoryTemplate() {
+		const QString tempPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+		return (tempPath.isEmpty() ? QDir::currentPath() : tempPath) + "/sandbox-tests-XXXXXX";
+	}
 } // namespace
 
 class WindowsSandboxTests : public QObject {
 	Q_OBJECT
-	QTemporaryDir root{QDir::currentPath() + "/sandbox-tests-XXXXXX"};
+	QTemporaryDir root{temporaryDirectoryTemplate()};
 	int sequence = 0;
 	QString python;
 	QString java;
