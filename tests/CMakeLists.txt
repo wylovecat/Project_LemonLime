@@ -6,6 +6,7 @@ add_subdirectory(judging-unit)
 add_subdirectory(judging-parallel)
 add_subdirectory(judging-cases)
 add_subdirectory(judging-stop)
+add_subdirectory(judging-soak)
 
 # Which directory the contest dialogs start in.  Registered as two ctest slots, one
 # per layout, because portable mode is decided once per process.

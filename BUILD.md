@@ -235,6 +235,10 @@ Windows 上测试进程要能找到 `Qt6*.dll`、`g++` 与 `python`，把 Qt 的
 `python` 时评测用例会 `qFatal` 而不是静默跳过——CI 上这是有意的，宁可报错也不要
 假装评测过。
 
+`judging-soak` 在同一个进程里连续评测同一套数据多轮，并穿插中途停止的轮次，用来
+暴露跨轮次泄漏与多线程下的崩溃（issue #315）。默认轮次够 CI 跑完；本机长时间压测可以
+调大轮次，例如 `LEMON_JUDGE_SOAK_ROUNDS=50`（Windows 下用 `set`）。
+
 `windows-sandbox` 用例会临时改写 Python / Java 运行时目录的 DACL，给 AppContainer
 授予读取与执行权限，因此运行时必须装在当前用户能改权限的目录里。装在
 `C:\Python313` 这类属主为 `SYSTEM` / `Administrators` 的机器级目录时，准备阶段会
