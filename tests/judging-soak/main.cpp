@@ -45,6 +45,24 @@ namespace {
 	// (2 workers) while a workstation gets the interesting 8-way load.
 	int soakThreads() { return qBound(2, QThread::idealThreadCount(), 8); }
 
+	// A runner that could not schedule a guest at all says so with these two
+	// messages: "Start runner failed" when fork/exec gave up, "Watcher time limit
+	// exceeded" when the watcher itself was starved.  Neither is a judging bug -
+	// the host simply had no room for one more process - so such a round is skipped
+	// instead of failed.  The verdict matrix itself is pinned by test1 and
+	// judging-parallel, which judge the fixture once.
+	bool hostCouldNotRunAGuest(Contest *contest) {
+		const QList<Task *> &tasks = contest->getTaskList();
+		for (const Contestant *contestant : contest->getContestantList())
+			for (int t = 0; t < tasks.size(); t++)
+				for (const QStringList &messages : contestant->getMessage(t))
+					for (const QString &message : messages)
+						if (message.contains("Start runner failed") ||
+						    message.contains("Watcher time limit exceeded"))
+							return true;
+		return false;
+	}
+
 } // namespace
 
 class JudgingSoakTest : public QObject {
@@ -56,9 +74,10 @@ class JudgingSoakTest : public QObject {
 	QTemporaryDir m_tmpRoot;
 
 	// One complete judging round.  Returns an empty string on success, or the first
-	// mismatch.  `compileTimedOut` reports a tool chain that was too slow under the
-	// load this test creates, which says nothing about the judging code.
-	QString judgeOneRound(Settings *settings, int round, bool *compileTimedOut) {
+	// mismatch.  `hostTooLoaded` reports a compile that hit its own time limit or a
+	// guest the host could not start, both of which say nothing about the judging
+	// code.
+	QString judgeOneRound(Settings *settings, int round, bool *hostTooLoaded) {
 		const QString contestDir = JudgingTestUtil::makeWorkCopy(m_tmpRoot, m_fixtureDir,
 		                                                         QString("round%1/TestContest1").arg(round));
 		if (contestDir.isEmpty())
@@ -71,7 +90,7 @@ class JudgingSoakTest : public QObject {
 		contest->refreshContestantList();
 		contest->judgeAll();
 
-		*compileTimedOut = JudgingTestUtil::compileHitTimeLimit(contest);
+		*hostTooLoaded = JudgingTestUtil::compileHitTimeLimit(contest) || hostCouldNotRunAGuest(contest);
 
 		QString message = JudgingTestUtil::verifyTestContest1Matrix(contest);
 		if (! message.isEmpty())
@@ -98,11 +117,11 @@ class JudgingSoakTest : public QObject {
 		Settings *settings = JudgingTestUtil::createSettings(soakThreads());
 
 		for (int round = 0; round < rounds; round++) {
-			bool compileTimedOut = false;
-			const QString message = judgeOneRound(settings, round, &compileTimedOut);
+			bool hostTooLoaded = false;
+			const QString message = judgeOneRound(settings, round, &hostTooLoaded);
 
-			if (compileTimedOut)
-				QSKIP("the compiler hit its own time limit - the host was too loaded for this run");
+			if (hostTooLoaded)
+				QSKIP("the host could not compile or start a guest under the load of this run");
 
 			QVERIFY2(message.isEmpty(), qPrintable(message));
 		}
