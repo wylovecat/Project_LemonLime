@@ -8,6 +8,9 @@ add_subdirectory(judging-cases)
 add_subdirectory(judging-stop)
 add_subdirectory(judging-soak)
 
+# Throughput benchmark, skipped unless LEMON_JUDGE_BENCH=1 (not a gate).
+add_subdirectory(judging-benchmark)
+
 # Which directory the contest dialogs start in.  Registered as two ctest slots, one
 # per layout, because portable mode is decided once per process.
 add_subdirectory(portable-layout)
