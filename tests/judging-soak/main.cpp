@@ -52,8 +52,8 @@ class JudgingSoakTest : public QObject {
 	// mismatch.  `compileTimedOut` reports a tool chain that was too slow under the
 	// load this test creates, which says nothing about the judging code.
 	QString judgeOneRound(Settings *settings, int round, bool *compileTimedOut) {
-		const QString contestDir = JudgingTestUtil::makeWorkCopy(
-		    m_tmpRoot, m_fixtureDir, QString("round%1/TestContest1").arg(round));
+		const QString contestDir = JudgingTestUtil::makeWorkCopy(m_tmpRoot, m_fixtureDir,
+		                                                         QString("round%1/TestContest1").arg(round));
 		if (contestDir.isEmpty())
 			return QString("round %1: could not create a working copy").arg(round);
 
@@ -114,8 +114,7 @@ class JudgingSoakTest : public QObject {
 			    m_tmpRoot, m_stopFixtureDir, QString("stop%1/JudgingStop").arg(round));
 			QVERIFY2(! contestDir.isEmpty(), "Could not create a working copy of the JudgingStop fixture");
 
-			Contest *contest =
-			    JudgingTestUtil::loadContest(contestDir, "JudgingStop.cdf", settings, this);
+			Contest *contest = JudgingTestUtil::loadContest(contestDir, "JudgingStop.cdf", settings, this);
 			QVERIFY2(contest != nullptr, "Failed to load JudgingStop.cdf");
 			contest->refreshContestantList();
 
