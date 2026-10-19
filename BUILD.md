@@ -239,6 +239,11 @@ Windows 上测试进程要能找到 `Qt6*.dll`、`g++` 与 `python`，把 Qt 的
 暴露跨轮次泄漏与多线程下的崩溃（issue #315）。默认轮次够 CI 跑完；本机长时间压测可以
 调大轮次，例如 `LEMON_JUDGE_SOAK_ROUNDS=50`（Windows 下用 `set`）。
 
+用例池默认取 `min(核数, 8)`，避免在 2 核 CI 机器上用比机器还多的死循环把 watcher
+饿到 `CannotStartProgram`。要在本机压测「并发数超过核数」的极端情况，可以设
+`LEMON_JUDGE_SOAK_THREADS`（如 `12`）；这种情况下 host 来不及启动 guest 的轮次会被
+跳过而不是判失败。
+
 `windows-sandbox` 用例会临时改写 Python / Java 运行时目录的 DACL，给 AppContainer
 授予读取与执行权限，因此运行时必须装在当前用户能改权限的目录里。装在
 `C:\Python313` 这类属主为 `SYSTEM` / `Administrators` 的机器级目录时，准备阶段会

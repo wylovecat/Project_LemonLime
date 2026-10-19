@@ -42,8 +42,16 @@ namespace {
 	// More concurrent CPU-bound guests than the machine has cores starves the Unix
 	// watcher, which can turn a TLE into a "guest never started" report.  Capping the
 	// pool at the hardware still exercises the parallel path on a 2-core CI runner
-	// (2 workers) while a workstation gets the interesting 8-way load.
-	int soakThreads() { return qBound(2, QThread::idealThreadCount(), 8); }
+	// (2 workers) while a workstation gets the interesting 8-way load.  A deliberate
+	// stress run can overcommit with LEMON_JUDGE_SOAK_THREADS; a round the host cannot
+	// keep up with is skipped rather than failed.
+	int soakThreads() {
+		bool ok = false;
+		const int fromEnvironment = qEnvironmentVariableIntValue("LEMON_JUDGE_SOAK_THREADS", &ok);
+		if (ok && fromEnvironment > 0)
+			return fromEnvironment;
+		return qBound(2, QThread::idealThreadCount(), 8);
+	}
 
 	// A runner that could not schedule a guest at all says so with these two
 	// messages: "Start runner failed" when fork/exec gave up, "Watcher time limit
