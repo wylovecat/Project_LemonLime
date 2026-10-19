@@ -65,7 +65,8 @@ namespace JudgingTestUtil {
 
 		QString gppPath = QStandardPaths::findExecutable("g++");
 		if (gppPath.isEmpty())
-			qFatal("g++ not found on PATH - cannot run judging tests.");
+			qFatal("g++ not found on PATH - cannot run judging tests. "
+			       "Install MinGW-w64 (g++) or add the tool chain to PATH.");
 
 		auto *gpp = new Compiler();
 		gpp->setCompilerType(Compiler::Typical);
@@ -83,7 +84,8 @@ namespace JudgingTestUtil {
 		if (pythonPath.isEmpty())
 			pythonPath = QStandardPaths::findExecutable("python");
 		if (pythonPath.isEmpty())
-			qFatal("python/python3 not found on PATH - cannot run judging tests.");
+			qFatal("python/python3 not found on PATH - cannot run judging tests. "
+			       "Install Python or add it to PATH.");
 
 		auto *py = new Compiler();
 		py->setCompilerType(Compiler::InterpretiveWithoutByteCode);
