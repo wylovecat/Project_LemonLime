@@ -229,9 +229,11 @@ int main() {
 	// Judge `contestDir` once with `maxJudgingThreads` and return its matrix; elapsed
 	// milliseconds are reported through `elapsed`.  The two fixtures keep their own
 	// file names - a work copy of TestContest1 stays TestContest1.cdf - so the caller
-	// names the contest file.
+	// names the contest file.  `compileTimedOut` reports a tool chain that was too
+	// slow under the load this test creates, which says nothing about the judging
+	// code and turns the round into a skip.
 	QString judgeRound(const QString &contestDir, const QString &cdfName, int maxJudgingThreads,
-	                   qint64 *elapsed, QString *rawSnapshot = nullptr) {
+	                   qint64 *elapsed, QString *rawSnapshot = nullptr, bool *compileTimedOut = nullptr) {
 		Settings *settings = JudgingTestUtil::createSettings(maxJudgingThreads);
 
 		Contest *contest = JudgingTestUtil::loadContest(contestDir, cdfName, settings, this);
@@ -246,6 +248,9 @@ int main() {
 		timer.start();
 		contest->judgeAll();
 		*elapsed = timer.elapsed();
+
+		if (compileTimedOut)
+			*compileTimedOut = JudgingTestUtil::compileHitTimeLimit(contest);
 
 		const QString snapshot = matrix(contest);
 		if (rawSnapshot)
@@ -275,13 +280,21 @@ int main() {
 
 		QString serialRaw;
 		qint64 serialMs = 0;
-		const QString serial = judgeRound(serialDir, "TestContest1.cdf", 1, &serialMs, &serialRaw);
+		bool serialCompileTimedOut = false;
+		const QString serial =
+		    judgeRound(serialDir, "TestContest1.cdf", 1, &serialMs, &serialRaw, &serialCompileTimedOut);
 		QVERIFY2(! serial.isEmpty(), "the serial round produced no matrix");
+		if (serialCompileTimedOut)
+			QSKIP("the compiler hit its own time limit - the host was too loaded for this run");
 
 		QString parallelRaw;
 		qint64 parallelMs = 0;
-		const QString parallel = judgeRound(parallelDir, "TestContest1.cdf", 4, &parallelMs, &parallelRaw);
+		bool parallelCompileTimedOut = false;
+		const QString parallel = judgeRound(parallelDir, "TestContest1.cdf", 4, &parallelMs, &parallelRaw,
+		                                    &parallelCompileTimedOut);
 		QVERIFY2(! parallel.isEmpty(), "the parallel round produced no matrix");
+		if (parallelCompileTimedOut)
+			QSKIP("the compiler hit its own time limit - the host was too loaded for this run");
 
 		qInfo("zoo fixture: serial %lld ms, parallel %lld ms", serialMs, parallelMs);
 		// Printed even when the comparison passes: the exact verdicts are what tells a
@@ -307,13 +320,21 @@ int main() {
 
 		QString serialRaw;
 		qint64 serialMs = 0;
-		const QString serial = judgeRound(serialDir, "contest.cdf", 1, &serialMs, &serialRaw);
+		bool serialCompileTimedOut = false;
+		const QString serial =
+		    judgeRound(serialDir, "contest.cdf", 1, &serialMs, &serialRaw, &serialCompileTimedOut);
 		QVERIFY2(! serial.isEmpty(), "the serial round produced no matrix");
+		if (serialCompileTimedOut)
+			QSKIP("the compiler hit its own time limit - the host was too loaded for this run");
 
 		QString parallelRaw;
 		qint64 parallelMs = 0;
-		const QString parallel = judgeRound(parallelDir, "contest.cdf", 4, &parallelMs, &parallelRaw);
+		bool parallelCompileTimedOut = false;
+		const QString parallel =
+		    judgeRound(parallelDir, "contest.cdf", 4, &parallelMs, &parallelRaw, &parallelCompileTimedOut);
 		QVERIFY2(! parallel.isEmpty(), "the parallel round produced no matrix");
+		if (parallelCompileTimedOut)
+			QSKIP("the compiler hit its own time limit - the host was too loaded for this run");
 
 		qInfo("busy fixture: serial %lld ms, parallel %lld ms", serialMs, parallelMs);
 

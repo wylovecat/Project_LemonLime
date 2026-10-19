@@ -37,6 +37,13 @@
 using namespace Lemon::Windows;
 
 namespace {
+	// Compiling a three-line program with javac is a one-second job on a quiet
+	// machine, but a shared CI runner can take much longer while the tool chain
+	// warms up (and the whole point of this target is to run four of those in a
+	// row).  A failed wait here used to look like a sandbox bug: the tail of the
+	// RelWithDebInfo Windows run once reported `waitForFinished(kToolWaitMs)` for javac.
+	constexpr int kToolWaitMs = 60000;
+
 	QString quoteArgument(const QString &argument) {
 		QString result = "\"";
 		int slashes = 0;
@@ -968,7 +975,7 @@ class WindowsSandboxTests : public QObject {
 		        : "#include <iostream>\nint main(){int a,b;std::cin>>a>>b;std::cout<<a+b<<'\\n';}"));
 		QProcess compile;
 		compile.start(tool, {source, "-O2", "-o", cfg.executableFile});
-		QVERIFY(compile.waitForFinished(20000));
+		QVERIFY(compile.waitForFinished(kToolWaitMs));
 		QVERIFY2(compile.exitCode() == 0, compile.readAllStandardError().constData());
 
 		const auto result = run(cfg);
@@ -1063,7 +1070,7 @@ class WindowsSandboxTests : public QObject {
 		const auto directory = root.path() + "/venv";
 		QProcess create;
 		create.start(python, {"-m", "venv", "--without-pip", directory});
-		QVERIFY(create.waitForFinished(20000));
+		QVERIFY(create.waitForFinished(kToolWaitMs));
 		QCOMPARE(create.exitCode(), 0);
 		auto cfg = config("answer.py");
 		cfg.executableFile = cfg.runtimeExecutable = directory + "/Scripts/python.exe";
@@ -1098,7 +1105,7 @@ class WindowsSandboxTests : public QObject {
 		              "Scanner s = new Scanner(System.in); System.out.println(s.nextInt()+s.nextInt()); }}"));
 		QProcess compile;
 		compile.start(javac, {cfg.workingDirectory + "Main.java"});
-		QVERIFY(compile.waitForFinished(20000));
+		QVERIFY(compile.waitForFinished(kToolWaitMs));
 		QCOMPARE(compile.exitCode(), 0);
 
 		const auto first = run(cfg);
@@ -1128,7 +1135,7 @@ class WindowsSandboxTests : public QObject {
 		          "System.out.println(\"allowed\"); }}"));
 		QProcess compile;
 		compile.start(javac, {cfg.workingDirectory + "Main.java"});
-		QVERIFY(compile.waitForFinished(20000));
+		QVERIFY(compile.waitForFinished(kToolWaitMs));
 		QCOMPARE(compile.exitCode(), 0);
 		cfg.sandboxSettings.enabled = false;
 
