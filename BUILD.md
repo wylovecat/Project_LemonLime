@@ -223,3 +223,33 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
 cmake --build build --parallel
 open build/lemon.app
 ```
+
+## 运行测试
+
+```bash
+ctest --test-dir build --output-on-failure --timeout 600
+```
+
+Windows 上测试进程要能找到 `Qt6*.dll`、`g++` 与 `python`，把 Qt 的 `bin`、MinGW 的 `bin`
+和 Python 目录加进 `PATH` 再跑，否则测试会以 0xc0000135 直接退出。缺少 `g++` 或
+`python` 时评测用例会 `qFatal` 而不是静默跳过——CI 上这是有意的，宁可报错也不要
+假装评测过。
+
+`windows-sandbox` 用例会临时改写 Python / Java 运行时目录的 DACL，给 AppContainer
+授予读取与执行权限，因此运行时必须装在当前用户能改权限的目录里。装在
+`C:\Python313` 这类属主为 `SYSTEM` / `Administrators` 的机器级目录时，准备阶段会
+报 `Cannot set sandbox permissions ... 拒绝访问。(Windows error 5)`，相关用例失败。
+两种解法：
+
+- 用 python.org 的 per-user 安装（默认在 `%LOCALAPPDATA%\Programs\Python`），或
+  [Adoptium 的 per-user JDK](https://adoptium.net/)；
+- 或者接管该目录（需要管理员终端）：
+
+  ```bat
+  takeown /f C:\Python313 /r /d Y
+  icacls C:\Python313 /grant "%USERNAME%:(OI)(CI)(WDAC)" /T
+  ```
+
+  第二条只授予「修改权限」这一项，测试用完会把 AppContainer 的临时 ACE 撤销，
+  不会留下多余条目。想还原：`icacls C:\Python313 /remove:g "%USERNAME%"`，
+  再 `icacls C:\Python313 /setowner "BUILTIN\Administrators" /T`。
