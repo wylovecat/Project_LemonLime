@@ -71,6 +71,16 @@ ProcessRunnerResult WinProcessRunner::run() {
 		siex.StartupInfo.hStdInput = CreateFileW((const WCHAR *)(config.inputFile.utf16()), GENERIC_READ,
 		                                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &sa,
 		                                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		// OPEN_EXISTING does not create a missing file, and an invalid handle would
+		// otherwise be passed to CreateProcessW, which fails with no hint about why.
+		if (siex.StartupInfo.hStdInput == INVALID_HANDLE_VALUE) {
+			const DWORD code = GetLastError();
+			res.score = 0;
+			res.result = FileError;
+			res.message = "Cannot open the standard input file";
+			WARN(config.inputFile, "Failed to be opened", code);
+			return res;
+		}
 	}
 
 	if (config.standardOutputCheck) {
@@ -224,12 +234,10 @@ ProcessRunnerResult WinProcessRunner::run() {
 	res.memoryUsed = memoryInfo.PeakWorkingSetSize;
 	// PeakWorkingSetSize is a high-water mark, so this catches a submission that peaked
 	// above the limit between two 10ms samples and exited before it could be terminated.
-	if (config.memoryLimit != -1 && res.memoryUsed > 1ll * config.memoryLimit * 1024 * 1024) {
-		res.score = 0;
-		res.result = MemoryLimitExceeded;
-		res.timeUsed = -1;
-		return res;
-	}
+	// The verdict is applied after the sandbox checks below: returning here used to skip
+	// them (and their log line) for every run that hit the limit but still exited normally.
+	const bool memoryLimitExceeded =
+	    config.memoryLimit != -1 && res.memoryUsed > 1ll * config.memoryLimit * 1024 * 1024;
 	if (sandbox) {
 		const QDir work(config.workingDirectory);
 		const auto outputPath =
@@ -250,6 +258,12 @@ ProcessRunnerResult WinProcessRunner::run() {
 		}
 		LOG("Windows sandbox preparation (ms):", res.preparationTime, "ACL updates:", res.runtimeAclUpdates,
 		    "Cache hit:", res.runtimeCacheHit);
+	}
+	if (memoryLimitExceeded) {
+		res.score = 0;
+		res.result = MemoryLimitExceeded;
+		res.timeUsed = -1;
+		return res;
 	}
 	LOG(config.executableFile, "Successfully exited.");
 	LOG("User Time Used:", res.timeUsed, "ms, Kernel Time Used:", kernelTimeUsed,
