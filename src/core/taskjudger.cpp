@@ -436,14 +436,10 @@ int TaskJudger::judge() {
 		sandboxSession = WindowsSandbox::createSession();
 #endif
 
-	// A Windows sandbox session is a shared, ACL-backed resource and is not known to be
-	// usable from several threads at once, so that configuration - and anything that
-	// asked for a single worker - stays strictly sequential.
+	// A Windows sandbox session is a shared, ACL-backed resource.  Its preparation is
+	// serialized inside WindowsSandbox, but every case gets its own AppContainer profile
+	// and the running processes share nothing, so cases may overlap.
 	int workers = caseWorkers;
-#ifdef Q_OS_WIN
-	if (sandboxSettings.enabled)
-		workers = 1;
-#endif
 	workers = qMax(1, workers);
 
 	const int subtaskCount = task->getTestCaseList().size();

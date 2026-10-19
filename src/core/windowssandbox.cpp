@@ -36,6 +36,11 @@ using namespace Lemon::Windows;
 namespace {
 	QMutex permissionsMutex;
 	QMutex sessionMutex;
+	// Preparation creates an AppContainer profile and rewrites ACLs; cases in one judging
+	// round may prepare from several threads.  The gate keeps that work serialized, and it
+	// is taken before the preparation clock starts so a slow grant never eats the budget of
+	// the cases waiting behind it.
+	QMutex preparationMutex;
 	std::weak_ptr<WindowsSandboxSession> activeSession;
 	constexpr DWORD PrivateFileAccess =
 	    FILE_GENERIC_READ | FILE_GENERIC_WRITE | FILE_GENERIC_EXECUTE | DELETE;
@@ -603,6 +608,7 @@ struct WindowsSandbox::Data {
 	}
 
 	bool prepare() {
+		QMutexLocker preparation(&preparationMutex);
 		timer.start();
 		if (! checkBudget())
 			return false;

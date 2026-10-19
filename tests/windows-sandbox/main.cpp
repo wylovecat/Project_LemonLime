@@ -29,7 +29,9 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <atomic>
 #include <thread>
+#include <vector>
 #include <winsock2.h>
 
 using namespace Lemon::Windows;
@@ -504,6 +506,43 @@ class WindowsSandboxTests : public QObject {
 		QCOMPARE(permissions(directory + "/resource.txt"), granted);
 		two.reset();
 		QCOMPARE(permissions(directory + "/resource.txt"), before);
+	}
+
+	// Judging overlaps cases now, so several sandboxed processes run at once: each one
+	// creates its own AppContainer profile while sharing the session's ACL grants.
+	// Concurrent preparation must neither deadlock nor let one case's ACL work consume
+	// the preparation budget of the cases queued behind it.
+	void concurrentRuns() {
+		constexpr int kRuns = 8;
+		const auto session = WindowsSandbox::createSession();
+		const auto runtimeDirectory = root.path() + "/concurrent-runtime";
+		QVERIFY(QDir().mkpath(runtimeDirectory));
+		QVERIFY(write(runtimeDirectory + "/resource.txt", "runtime data"));
+
+		for (int round = 0; round < 3; ++round) {
+			std::vector<ProcessRunnerConfig> configs;
+			configs.reserve(kRuns);
+			for (int i = 0; i < kRuns; ++i) {
+				configs.push_back(config("sum"));
+				configs.back().sandboxSession = session;
+				if (round > 0)
+					configs.back().sandboxSettings.readOnlyDirectories = {runtimeDirectory};
+			}
+
+			std::vector<ProcessRunnerResult> results(kRuns);
+			std::vector<std::thread> threads;
+			threads.reserve(kRuns);
+			for (int i = 0; i < kRuns; ++i)
+				threads.emplace_back([this, &configs, &results, i] { results[i] = run(configs[i]); });
+			for (auto &thread : threads)
+				thread.join();
+
+			for (int i = 0; i < kRuns; ++i) {
+				QVERIFY2(results[i].result == CorrectAnswer, qPrintable(results[i].message));
+				QCOMPARE(read(configs[i].workingDirectory + "_tmpout").trimmed(), QByteArray("42"));
+				QVERIFY(! permissions(configs[i].workingDirectory).contains("S-1-15-2-"));
+			}
+		}
 	}
 
 	void workPermissionsArePreserved_data() {

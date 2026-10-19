@@ -103,6 +103,40 @@ class JudgingSoakTest : public QObject {
 		delete settings;
 	}
 
+	// The Windows sandbox used to force a single worker per task, so opening it turned a
+	// multi-core machine into a serial judge.  Cases now overlap there too, which means
+	// several AppContainer profiles prepare against one shared session; the verdicts must
+	// stay identical to the unsandboxed rounds above.
+	void testSandboxedRoundsKeepTheirVerdicts() {
+#ifdef Q_OS_WIN
+		Settings *settings = JudgingTestUtil::createSettings(8);
+		for (Compiler *compiler : settings->getCompilerList()) {
+			// Keep the interpreter out of the sandbox: granting a Python installation
+			// costs a long one-time ACL walk that is not what this test covers.
+			if (compiler->getCompilerType() != Compiler::Typical)
+				continue;
+			SandboxSettings sandbox;
+			sandbox.enabled = true;
+			sandbox.runtime = SandboxSettings::Native;
+			compiler->setSandboxSettings(sandbox);
+		}
+
+		for (int round = 0; round < 2; round++) {
+			bool compileTimedOut = false;
+			const QString message = judgeOneRound(settings, round + 100, &compileTimedOut);
+
+			if (compileTimedOut)
+				QSKIP("the compiler hit its own time limit - the host was too loaded for this run");
+
+			QVERIFY2(message.isEmpty(), qPrintable(message));
+		}
+
+		delete settings;
+#else
+		QSKIP("the Windows sandbox only exists on Windows");
+#endif
+	}
+
 	// The crash reports are about judging looping for a long time, so the stop path
 	// that runs in the middle of it gets the same treatment: several rounds in which
 	// the round is interrupted while the judging threads are alive.
