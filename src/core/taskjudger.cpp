@@ -332,7 +332,11 @@ auto TaskJudger::traditionalTaskPrepare() -> bool {
 				}
 			}
 
-			makeDialogAlert(tr("Compiled Successfully"));
+			// Only a compile that actually succeeded gets announced: the loop above
+			// breaks out on a compile error or a missing compiler after setting
+			// compileState, and announcing success there used to mislead the contestant.
+			if (compileState == CompileSuccessfully)
+				makeDialogAlert(tr("Compiled Successfully"));
 		}
 
 		if (i->getCompilerType() == Compiler::InterpretiveWithoutByteCode)
