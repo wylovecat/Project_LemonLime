@@ -219,6 +219,26 @@ namespace JudgingTestUtil {
 			return r == RunTimeError || r == MemoryLimitExceeded || r == CannotStartProgram;
 		};
 
+		// A CPU-bound case can lose its watcher to the scheduler: when the machine runs
+		// more guests than it has cores, the runner may run out of time while waiting
+		// for the watcher itself and reports CannotStartProgram with
+		// "Watcher time limit exceeded" instead of the verdict (see
+		// processrunner_unix.cpp).  The case still produced no answer in time, so that
+		// specific message is accepted as TLE; a guest that never started carries a
+		// different message and still fails here.
+		auto okTimeLimit = [](const Contestant *c, int task, int tc) {
+			const auto &res = c->getResult(task);
+			if (tc >= res.size() || res.at(tc).isEmpty())
+				return false;
+			if (res.at(tc).at(0) == TimeLimitExceeded)
+				return true;
+			if (res.at(tc).at(0) != CannotStartProgram)
+				return false;
+			const auto &messages = c->getMessage(task);
+			return tc < messages.size() &&
+			       messages.at(tc).join(QLatin1Char('\n')).contains("Watcher time limit exceeded");
+		};
+
 		// user2 always prints "AC", so all 6 test cases must be AC.
 		{
 			const auto &res = user2->getResult(helloworldIdx);
@@ -239,8 +259,10 @@ namespace JudgingTestUtil {
 				return QString("user1 helloworld: %1 rows, expected 6").arg(res.size());
 			if (res[0][0] != CorrectAnswer)
 				return QString("user1 helloworld case 0: expected AC, got %1").arg(int(res[0][0]));
-			if (res[1][0] != TimeLimitExceeded)
-				return QString("user1 helloworld case 1: expected TLE, got %1").arg(int(res[1][0]));
+			if (! okTimeLimit(user1, helloworldIdx, 1))
+				return QString("user1 helloworld case 1: expected TLE, got %1 %2")
+				    .arg(int(res[1][0]))
+				    .arg(user1->getMessage(helloworldIdx).value(1).join(QLatin1Char(' ')));
 			if (! okRuntime(res[2][0]))
 				return QString("user1 helloworld case 2: expected MLE/RE, got %1").arg(int(res[2][0]));
 			if (res[3][0] != WrongAnswer)

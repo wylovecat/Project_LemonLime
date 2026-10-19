@@ -21,6 +21,7 @@
 
 #include <QElapsedTimer>
 #include <QTest>
+#include <QThread>
 #include <QTimer>
 
 namespace {
@@ -37,6 +38,12 @@ namespace {
 		const int fromEnvironment = qEnvironmentVariableIntValue("LEMON_JUDGE_SOAK_ROUNDS", &ok);
 		return ok && fromEnvironment > 0 ? fromEnvironment : kDefaultRounds;
 	}
+
+	// More concurrent CPU-bound guests than the machine has cores starves the Unix
+	// watcher, which can turn a TLE into a "guest never started" report.  Capping the
+	// pool at the hardware still exercises the parallel path on a 2-core CI runner
+	// (2 workers) while a workstation gets the interesting 8-way load.
+	int soakThreads() { return qBound(2, QThread::idealThreadCount(), 8); }
 
 } // namespace
 
@@ -88,7 +95,7 @@ class JudgingSoakTest : public QObject {
 
 	void testRepeatedRoundsKeepTheirVerdicts() {
 		const int rounds = soakRounds();
-		Settings *settings = JudgingTestUtil::createSettings(8);
+		Settings *settings = JudgingTestUtil::createSettings(soakThreads());
 
 		for (int round = 0; round < rounds; round++) {
 			bool compileTimedOut = false;
@@ -109,7 +116,7 @@ class JudgingSoakTest : public QObject {
 	// stay identical to the unsandboxed rounds above.
 	void testSandboxedRoundsKeepTheirVerdicts() {
 #ifdef Q_OS_WIN
-		Settings *settings = JudgingTestUtil::createSettings(8);
+		Settings *settings = JudgingTestUtil::createSettings(soakThreads());
 		for (Compiler *compiler : settings->getCompilerList()) {
 			// Keep the interpreter out of the sandbox: granting a Python installation
 			// costs a long one-time ACL walk that is not what this test covers.
