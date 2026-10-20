@@ -12,6 +12,8 @@
 #include "core/task.h"
 #include "core/testcase.h"
 
+#include "../common/judging_test_util.hpp"
+
 #include "base/LemonLog.hpp"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
@@ -267,94 +269,14 @@ class TestContest : public QObject {
 			}
 		}
 
-		// ---- Verify per-test-case verdicts for helloworld ----
-		// The task has 6 test cases, each in its own subtask.
-		// getResult(taskIdx)[subtask][0] gives the ResultState for test case #subtask.
-		//
-		// Expected verdicts (from CDF result array, cross-checked with source):
-		//   case 0 (input=1):  AC  — prints "AC", matches expected
-		//   case 1 (input=4):  TLE — while(1); infinite loop
-		//   case 2 (input=3):  MLE — while(1)new int[...]; memory exhaustion
-		//   case 3 (input=2):  WA  — prints "WA", output doesn't match "AC"
-		//   case 4 (input=5):  RE  — vector OOB assertion failure in f(100)
-		//   case 5 (input=21): WA  — falls through to default: break; empty output
-
-		const QList<Task *> &tasks = contest->getTaskList();
-		int helloworldIdx = -1;
-		for (int i = 0; i < tasks.size(); i++) {
-			if (tasks[i]->getProblemTitle() == "helloworld")
-				helloworldIdx = i;
-		}
-		QVERIFY2(helloworldIdx >= 0, "Task 'helloworld' not found");
-
-		// RE and MLE are treated as equivalent (platform-dependent)
-		auto isRuntimeFailure = [](ResultState r) { return r == RunTimeError || r == MemoryLimitExceeded; };
-
-		// --- user2: always prints "AC" → all 6 test cases must be AC ---
-		Contestant *user2 = contest->getContestant("user2");
-		QVERIFY2(user2 != nullptr, "Contestant 'user2' not found");
-		{
-			const auto &res = user2->getResult(helloworldIdx);
-			QCOMPARE(res.size(), 6);
-			for (int tc = 0; tc < 6; tc++) {
-				qDebug() << user2->getMessage(helloworldIdx)[tc];
-				QVERIFY2(
-				    res[tc][0] == CorrectAnswer,
-				    qPrintable(
-				        QString("user2 helloworld case %1: expected AC, got %2").arg(tc).arg(res[tc][0])));
-			}
-		}
-
-		// --- user1: AC, TLE, MLE, WA, RE, WA ---
-		Contestant *user1 = contest->getContestant("user1");
-		QVERIFY2(user1 != nullptr, "Contestant 'user1' not found");
-		{
-			const auto &res = user1->getResult(helloworldIdx);
-			QCOMPARE(res.size(), 6);
-
-			// case 0: AC
-			QVERIFY2(res[0][0] == CorrectAnswer,
-			         qPrintable(QString("user1 helloworld case 0: expected AC, got %1").arg(res[0][0])));
-
-			// case 1: TLE
-			QVERIFY2(res[1][0] == TimeLimitExceeded,
-			         qPrintable(QString("user1 helloworld case 1: expected TLE, got %1").arg(res[1][0])));
-
-			// case 2: MLE (may appear as MLE or RE depending on platform)
-			qDebug() << user1->getMessage(helloworldIdx)[2];
-			QVERIFY2(isRuntimeFailure(res[2][0]),
-			         qPrintable(QString("user1 helloworld case 2: expected MLE/RE, got %1").arg(res[2][0])));
-
-			// case 3: WA
-			QVERIFY2(res[3][0] == WrongAnswer,
-			         qPrintable(QString("user1 helloworld case 3: expected WA, got %1").arg(res[3][0])));
-
-			// case 4: RE (vector OOB; may also appear as MLE on some platforms)
-			QVERIFY2(isRuntimeFailure(res[4][0]),
-			         qPrintable(QString("user1 helloworld case 4: expected RE/MLE, got %1").arg(res[4][0])));
-
-			// case 5: WA (empty output)
-			QVERIFY2(res[5][0] == WrongAnswer,
-			         qPrintable(QString("user1 helloworld case 5: expected WA, got %1").arg(res[5][0])));
-		}
-
-		// --- user2 has no aplusb source: every test case must report the failure ---
-		// (user2, aplusb) cannot be prepared at all, so the task is judged with
-		// one CompileFailed per test case instead of an empty result table.
-		int aplusbIdx = -1;
-		for (int i = 0; i < tasks.size(); i++) {
-			if (tasks[i]->getProblemTitle() == "aplusb")
-				aplusbIdx = i;
-		}
-		QVERIFY2(aplusbIdx >= 0, "Task 'aplusb' not found");
-		{
-			const auto &res = user2->getResult(aplusbIdx);
-			QCOMPARE(res.size(), 1);
-			QCOMPARE(res.at(0).size(), 1);
-			QVERIFY2(
-			    res.at(0).at(0) == CompileFailed,
-			    qPrintable(QString("user2 aplusb: expected CompileFailed, got %1").arg(res.at(0).at(0))));
-		}
+		// ---- Verify the verdict matrix ----
+		// The expected verdicts live in one place, tests/common/judging_test_util.hpp,
+		// so this test and the repeated-round targets cannot drift apart: the soak and
+		// benchmark targets compare against the same matrix, including its tolerance
+		// for a loaded host (a watcher that ran out of time, a memory hungry guest the
+		// sandbox could not start).
+		const QString matrixError = JudgingTestUtil::verifyTestContest1Matrix(contest);
+		QVERIFY2(matrixError.isEmpty(), qPrintable(matrixError));
 
 		delete contest;
 		delete settings;
