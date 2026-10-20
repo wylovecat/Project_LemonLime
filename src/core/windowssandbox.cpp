@@ -219,8 +219,8 @@ namespace {
 } // namespace
 
 // One AppContainer identity.  A profile costs 15-250 ms to create on a loaded machine,
-// which used to dominate the per-case preparation time, so a session keeps a pool of
-// them and lends one to a case at a time.
+// which used to dominate the per-case preparation time, so one pool keeps a handful of
+// them for the whole process and lends one to a case at a time.
 class WindowsSandboxProfile {
   public:
 	WindowsSandboxProfile(QString name, PSID sid) : name(std::move(name)), sid(sid) {}
@@ -237,26 +237,15 @@ class WindowsSandboxProfile {
 	PSID sid = nullptr;
 };
 
-class WindowsSandboxSession {
+// Identities carry no ACL state of their own, so the pool can outlive a judging session:
+// it survives rounds and contests, and the profiles are deleted when the process exits.
+class ProfilePool {
   public:
-	QString id = QUuid::createUuid().toString(QUuid::Id128);
-	QByteArray allPackagesSid;
-	QHash<QString, QString> runtimes;
-	QHash<QString, QStringList> pythonRoots;
-	std::vector<RuntimeAcl> grants;
-
-	~WindowsSandboxSession() {
-		QMutexLocker lock(&permissionsMutex);
-		for (auto it = grants.rbegin(); it != grants.rend(); ++it)
-			revokeSid(it->path, it->sid.data());
-		// The profiles below are deleted once the runtime grants are gone.
-	}
-
 	// A profile is lent to at most one running case, so two guests never share an
 	// identity and a leftover grant can never point at another case.
-	WindowsSandboxProfile *acquireProfile(DWORD &error, bool &reused) {
+	WindowsSandboxProfile *acquire(DWORD &error, bool &reused) {
 		{
-			QMutexLocker lock(&profileMutex);
+			QMutexLocker lock(&mutex);
 			if (! freeProfiles.empty()) {
 				auto *profile = freeProfiles.back();
 				freeProfiles.pop_back();
@@ -275,18 +264,18 @@ class WindowsSandboxSession {
 		}
 
 		auto profile = std::make_unique<WindowsSandboxProfile>(name, sid);
-		QMutexLocker lock(&profileMutex);
+		QMutexLocker lock(&mutex);
 		profiles.push_back(std::move(profile));
 		return profiles.back().get();
 	}
 
 	// A profile whose working-directory grants could not be revoked is destroyed instead
 	// of reused: an identity must never outlive the access it was given.
-	void releaseProfile(WindowsSandboxProfile *profile, bool reusable) {
+	void release(WindowsSandboxProfile *profile, bool reusable) {
 		if (! profile)
 			return;
 
-		QMutexLocker lock(&profileMutex);
+		QMutexLocker lock(&mutex);
 		if (reusable) {
 			freeProfiles.push_back(profile);
 			return;
@@ -297,9 +286,29 @@ class WindowsSandboxSession {
 	}
 
   private:
-	QMutex profileMutex;
+	QMutex mutex;
 	std::vector<std::unique_ptr<WindowsSandboxProfile>> profiles;
 	std::vector<WindowsSandboxProfile *> freeProfiles;
+};
+
+ProfilePool &profilePool() {
+	static ProfilePool pool;
+	return pool;
+}
+
+class WindowsSandboxSession {
+  public:
+	QString id = QUuid::createUuid().toString(QUuid::Id128);
+	QByteArray allPackagesSid;
+	QHash<QString, QString> runtimes;
+	QHash<QString, QStringList> pythonRoots;
+	std::vector<RuntimeAcl> grants;
+
+	~WindowsSandboxSession() {
+		QMutexLocker lock(&permissionsMutex);
+		for (auto it = grants.rbegin(); it != grants.rend(); ++it)
+			revokeSid(it->path, it->sid.data());
+	}
 };
 
 struct WindowsSandbox::Data {
@@ -347,7 +356,7 @@ struct WindowsSandbox::Data {
 		}
 
 		if (profile) {
-			session->releaseProfile(profile, revoked);
+			profilePool().release(profile, revoked);
 			profile = nullptr;
 		}
 
@@ -699,7 +708,7 @@ struct WindowsSandbox::Data {
 		QElapsedTimer phase;
 		phase.start();
 		DWORD profileError = ERROR_SUCCESS;
-		profile = session->acquireProfile(profileError, reused);
+		profile = profilePool().acquire(profileError, reused);
 		if (! profile)
 			return fail("Cannot create AppContainer.", {}, profileError);
 		packageSid = profile->sid;

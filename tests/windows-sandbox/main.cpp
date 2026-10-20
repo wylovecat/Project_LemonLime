@@ -552,18 +552,20 @@ class WindowsSandboxTests : public QObject {
 		}
 	}
 
-	// A profile costs 15-250 ms to create, so a session lends the same identity to one
-	// case at a time instead of creating a fresh one for every case.
+	// A profile costs 15-250 ms to create, so the process lends the same identity to one
+	// case at a time instead of creating a fresh one for every case - and it outlives the
+	// judging session that one round owns.
 	void profileReuse() {
-		auto session = WindowsSandbox::createSession();
+		auto firstSession = WindowsSandbox::createSession();
 		auto first = config("sum");
-		first.sandboxSession = session;
+		first.sandboxSession = firstSession;
 		const auto cold = run(first);
 		QVERIFY2(cold.result == CorrectAnswer, qPrintable(cold.message));
-		QVERIFY(! cold.sandboxProfileReused);
+		firstSession.reset();
 
+		auto secondSession = WindowsSandbox::createSession();
 		auto second = config("sum");
-		second.sandboxSession = session;
+		second.sandboxSession = secondSession;
 		const auto warm = run(second);
 		QVERIFY2(warm.result == CorrectAnswer, qPrintable(warm.message));
 		QVERIFY(warm.sandboxProfileReused);
