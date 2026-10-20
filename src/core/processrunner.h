@@ -49,6 +49,7 @@ struct ProcessRunnerResult {
 	qint64 preparationTime = 0;
 	int runtimeAclUpdates = 0;
 	bool runtimeCacheHit = false;
+	bool sandboxProfileReused = false;
 };
 
 class ProcessRunner {

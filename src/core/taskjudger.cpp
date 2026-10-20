@@ -437,8 +437,8 @@ int TaskJudger::judge() {
 #endif
 
 	// A Windows sandbox session is a shared, ACL-backed resource.  Its preparation is
-	// serialized inside WindowsSandbox, but every case gets its own AppContainer profile
-	// and the running processes share nothing, so cases may overlap.
+	// serialized inside WindowsSandbox, and each running case borrows its own AppContainer
+	// profile from the session, so cases may overlap.
 	int workers = caseWorkers;
 	workers = qMax(1, workers);
 

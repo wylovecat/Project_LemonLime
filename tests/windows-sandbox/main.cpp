@@ -516,7 +516,7 @@ class WindowsSandboxTests : public QObject {
 	}
 
 	// Judging overlaps cases now, so several sandboxed processes run at once: each one
-	// creates its own AppContainer profile while sharing the session's ACL grants.
+	// borrows its own AppContainer profile while sharing the session's ACL grants.
 	// Concurrent preparation must neither deadlock nor let one case's ACL work consume
 	// the preparation budget of the cases queued behind it.
 	void concurrentRuns() {
@@ -550,6 +550,25 @@ class WindowsSandboxTests : public QObject {
 				QVERIFY(! permissions(configs[i].workingDirectory).contains("S-1-15-2-"));
 			}
 		}
+	}
+
+	// A profile costs 15-250 ms to create, so a session lends the same identity to one
+	// case at a time instead of creating a fresh one for every case.
+	void profileReuse() {
+		auto session = WindowsSandbox::createSession();
+		auto first = config("sum");
+		first.sandboxSession = session;
+		const auto cold = run(first);
+		QVERIFY2(cold.result == CorrectAnswer, qPrintable(cold.message));
+		QVERIFY(! cold.sandboxProfileReused);
+
+		auto second = config("sum");
+		second.sandboxSession = session;
+		const auto warm = run(second);
+		QVERIFY2(warm.result == CorrectAnswer, qPrintable(warm.message));
+		QVERIFY(warm.sandboxProfileReused);
+		// The identity is only lent out again once the first case's grants are gone.
+		QVERIFY(! permissions(second.workingDirectory).contains("S-1-15-2-"));
 	}
 
 	void workPermissionsArePreserved_data() {

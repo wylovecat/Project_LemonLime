@@ -26,7 +26,10 @@
 #include <QTemporaryDir>
 #include <QUuid>
 #include <aclapi.h>
+#include <algorithm>
+#include <memory>
 #include <userenv.h>
+#include <utility>
 #include <vector>
 
 #define LEMON_MODULE_NAME "WindowsSandbox"
@@ -113,13 +116,17 @@ namespace {
 		return Handle(file);
 	}
 
-	void revokeSid(const QString &path, PSID sid, bool privateFile = false) {
+	// Returns false when an ACE may have been left behind, so the caller can retire the
+	// identity instead of handing it to another case.
+	bool revokeSid(const QString &path, PSID sid, bool privateFile = false) {
 		auto file = openAclFile(path, privateFile);
 		if (! file) {
 			const DWORD code = GetLastError();
-			if (code != ERROR_FILE_NOT_FOUND && code != ERROR_PATH_NOT_FOUND)
+			if (code != ERROR_FILE_NOT_FOUND && code != ERROR_PATH_NOT_FOUND) {
 				WARN("Cannot open file to revoke sandbox permissions.", path, errorText(code));
-			return;
+				return false;
+			}
+			return true;
 		}
 
 		LocalMemory<PSECURITY_DESCRIPTOR> descriptor;
@@ -128,7 +135,7 @@ namespace {
 		                               nullptr, &acl, nullptr, descriptor.put());
 		if (status != ERROR_SUCCESS) {
 			WARN("Cannot read sandbox permissions for cleanup.", path, errorText(status));
-			return;
+			return false;
 		}
 
 		bool changed = false;
@@ -146,9 +153,12 @@ namespace {
 		if (changed) {
 			status = SetSecurityInfo(file.get(), SE_FILE_OBJECT, daclInformation(descriptor.get()), nullptr,
 			                         nullptr, acl, nullptr);
-			if (status != ERROR_SUCCESS)
+			if (status != ERROR_SUCCESS) {
 				WARN("Cannot revoke sandbox permissions.", path, errorText(status));
+				return false;
+			}
 		}
+		return true;
 	}
 
 	struct RuntimeAcl {
@@ -208,6 +218,25 @@ namespace {
 	}
 } // namespace
 
+// One AppContainer identity.  A profile costs 15-250 ms to create on a loaded machine,
+// which used to dominate the per-case preparation time, so a session keeps a pool of
+// them and lends one to a case at a time.
+class WindowsSandboxProfile {
+  public:
+	WindowsSandboxProfile(QString name, PSID sid) : name(std::move(name)), sid(sid) {}
+	~WindowsSandboxProfile() {
+		if (sid) {
+			DeleteAppContainerProfile(wide(name));
+			FreeSid(sid);
+		}
+	}
+	WindowsSandboxProfile(const WindowsSandboxProfile &) = delete;
+	WindowsSandboxProfile &operator=(const WindowsSandboxProfile &) = delete;
+
+	QString name;
+	PSID sid = nullptr;
+};
+
 class WindowsSandboxSession {
   public:
 	QString id = QUuid::createUuid().toString(QUuid::Id128);
@@ -220,14 +249,64 @@ class WindowsSandboxSession {
 		QMutexLocker lock(&permissionsMutex);
 		for (auto it = grants.rbegin(); it != grants.rend(); ++it)
 			revokeSid(it->path, it->sid.data());
+		// The profiles below are deleted once the runtime grants are gone.
 	}
+
+	// A profile is lent to at most one running case, so two guests never share an
+	// identity and a leftover grant can never point at another case.
+	WindowsSandboxProfile *acquireProfile(DWORD &error, bool &reused) {
+		{
+			QMutexLocker lock(&profileMutex);
+			if (! freeProfiles.empty()) {
+				auto *profile = freeProfiles.back();
+				freeProfiles.pop_back();
+				reused = true;
+				return profile;
+			}
+		}
+
+		const QString name = "LemonLime.Run." + QUuid::createUuid().toString(QUuid::Id128);
+		PSID sid = nullptr;
+		const HRESULT status =
+		    CreateAppContainerProfile(wide(name), wide(name), L"LemonLime judging", nullptr, 0, &sid);
+		if (FAILED(status)) {
+			error = DWORD(status);
+			return nullptr;
+		}
+
+		auto profile = std::make_unique<WindowsSandboxProfile>(name, sid);
+		QMutexLocker lock(&profileMutex);
+		profiles.push_back(std::move(profile));
+		return profiles.back().get();
+	}
+
+	// A profile whose working-directory grants could not be revoked is destroyed instead
+	// of reused: an identity must never outlive the access it was given.
+	void releaseProfile(WindowsSandboxProfile *profile, bool reusable) {
+		if (! profile)
+			return;
+
+		QMutexLocker lock(&profileMutex);
+		if (reusable) {
+			freeProfiles.push_back(profile);
+			return;
+		}
+		profiles.erase(std::remove_if(profiles.begin(), profiles.end(),
+		                              [profile](const auto &item) { return item.get() == profile; }),
+		               profiles.end());
+	}
+
+  private:
+	QMutex profileMutex;
+	std::vector<std::unique_ptr<WindowsSandboxProfile>> profiles;
+	std::vector<WindowsSandboxProfile *> freeProfiles;
 };
 
 struct WindowsSandbox::Data {
 	const ProcessRunnerConfig &config;
 	QElapsedTimer timer;
 
-	QString profileName;
+	WindowsSandboxProfile *profile = nullptr;
 	PSID packageSid = nullptr;
 	QString workingDirectory;
 
@@ -246,7 +325,9 @@ struct WindowsSandbox::Data {
 
 	int updates = 0;
 	bool hit = true;
+	bool reused = false;
 	QString error;
+	WindowsSandbox::PreparationTiming timing;
 
 	explicit Data(const ProcessRunnerConfig &config)
 	    : config(config),
@@ -255,21 +336,23 @@ struct WindowsSandbox::Data {
 	~Data() {
 		job.reset();
 
+		bool revoked = true;
 		if (! workingDirectory.isEmpty()) {
 			QMutexLocker lock(&permissionsMutex);
-			revokeSid(workingDirectory, packageSid, true);
+			revoked = revokeSid(workingDirectory, packageSid, true);
 			const QDirListing files(workingDirectory, QDirListing::IteratorFlag::Recursive |
 			                                              QDirListing::IteratorFlag::IncludeHidden);
 			for (const auto &file : files)
-				revokeSid(file.filePath(), packageSid, true);
+				revoked = revokeSid(file.filePath(), packageSid, true) && revoked;
+		}
+
+		if (profile) {
+			session->releaseProfile(profile, revoked);
+			profile = nullptr;
 		}
 
 		if (attributeList)
 			DeleteProcThreadAttributeList(attributeList);
-		if (packageSid) {
-			DeleteAppContainerProfile(wide(profileName));
-			FreeSid(packageSid);
-		}
 	}
 
 	bool checkBudget() {
@@ -613,11 +696,14 @@ struct WindowsSandbox::Data {
 		if (! checkBudget())
 			return false;
 
-		profileName = "LemonLime.Run." + QUuid::createUuid().toString(QUuid::Id128);
-		const HRESULT status = CreateAppContainerProfile(wide(profileName), wide(profileName),
-		                                                 L"LemonLime judging", nullptr, 0, &packageSid);
-		if (FAILED(status))
-			return fail("Cannot create AppContainer.", {}, DWORD(status));
+		QElapsedTimer phase;
+		phase.start();
+		DWORD profileError = ERROR_SUCCESS;
+		profile = session->acquireProfile(profileError, reused);
+		if (! profile)
+			return fail("Cannot create AppContainer.", {}, profileError);
+		packageSid = profile->sid;
+		timing.profileMs = phase.elapsed();
 
 		QString tool = config.runtimeExecutable;
 		if (! tool.isEmpty() && QFileInfo(tool).isRelative()) {
@@ -642,8 +728,16 @@ struct WindowsSandbox::Data {
 				runtime = SandboxSettings::Native;
 		}
 
+		phase.restart();
 		QStringList roots;
-		if (! prepareRuntimePermissions(tool, roots) || ! preparePrivateFiles())
+		const bool runtimeGranted = prepareRuntimePermissions(tool, roots);
+		timing.permissionsMs = phase.elapsed();
+		if (! runtimeGranted)
+			return false;
+		phase.restart();
+		const bool filesGranted = preparePrivateFiles();
+		timing.filesMs = phase.elapsed();
+		if (! filesGranted)
 			return false;
 
 		const auto system = QProcessEnvironment::systemEnvironment();
@@ -700,4 +794,6 @@ bool WindowsSandbox::prepareProcess(STARTUPINFOEXW &startup, QString &error) {
 const QProcessEnvironment &WindowsSandbox::environment() const { return data->childEnvironment; }
 int WindowsSandbox::aclUpdates() const { return data->updates; }
 bool WindowsSandbox::cacheHit() const { return data->hit; }
+bool WindowsSandbox::profileReused() const { return data->reused; }
+WindowsSandbox::PreparationTiming WindowsSandbox::preparationTiming() const { return data->timing; }
 #endif

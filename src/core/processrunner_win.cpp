@@ -46,6 +46,7 @@ ProcessRunnerResult WinProcessRunner::run() {
 		res.preparationTime = preparation.elapsed();
 		res.runtimeAclUpdates = sandbox->aclUpdates();
 		res.runtimeCacheHit = sandbox->cacheHit();
+		res.sandboxProfileReused = sandbox->profileReused();
 		if (! prepared) {
 			res.result = CannotStartProgram;
 			res.message = error;
@@ -256,8 +257,10 @@ ProcessRunnerResult WinProcessRunner::run() {
 				return res;
 			}
 		}
-		LOG("Windows sandbox preparation (ms):", res.preparationTime, "ACL updates:", res.runtimeAclUpdates,
-		    "Cache hit:", res.runtimeCacheHit);
+		const auto timing = sandbox->preparationTiming();
+		LOG("Windows sandbox preparation (ms):", res.preparationTime, "profile:", timing.profileMs,
+		    "runtime:", timing.permissionsMs, "files:", timing.filesMs, "ACL updates:", res.runtimeAclUpdates,
+		    "Cache hit:", res.runtimeCacheHit, "Profile reused:", res.sandboxProfileReused);
 	}
 	if (memoryLimitExceeded) {
 		res.score = 0;
