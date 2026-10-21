@@ -149,6 +149,14 @@ class JudgingSoakTest : public QObject {
 			// costs a long one-time ACL walk that is not what this test covers.
 			if (compiler->getCompilerType() != Compiler::Typical)
 				continue;
+			// Creating a process inside an AppContainer is slower than starting it
+			// normally, and this round runs several of them at once on a CI runner.
+			// The matrix only pins which verdict class each case lands in - an
+			// infinite loop stays TLE and the memory hog stays MLE - so a stretched
+			// time limit costs nothing here and keeps a starved but correct guest
+			// from being reported as a judging failure.  Timings themselves are
+			// pinned by test1, which judges the fixture once without the sandbox.
+			compiler->setTimeLimitRatio(3.0);
 			SandboxSettings sandbox;
 			sandbox.enabled = true;
 			sandbox.runtime = SandboxSettings::Native;
