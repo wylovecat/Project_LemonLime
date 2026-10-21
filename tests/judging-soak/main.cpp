@@ -53,6 +53,20 @@ namespace {
 		return qBound(2, QThread::idealThreadCount(), 8);
 	}
 
+	// Starting a process inside an AppContainer costs more than starting it normally,
+	// and the cost grows with the number of starts in flight at once.  On a 2-core CI
+	// runner the sandboxed round therefore keeps half the pool: it still runs several
+	// sandboxed cases at the same time - which is what this test is about - without
+	// queueing more profile preparations than the machine can start.  The unsandboxed
+	// rounds above keep the full pool.
+	int sandboxSoakThreads() {
+		bool ok = false;
+		const int fromEnvironment = qEnvironmentVariableIntValue("LEMON_JUDGE_SOAK_THREADS", &ok);
+		if (ok && fromEnvironment > 0)
+			return fromEnvironment;
+		return qBound(2, QThread::idealThreadCount() / 2, 4);
+	}
+
 	// A runner that could not schedule a guest at all says so with these two
 	// messages: "Start runner failed" when fork/exec gave up, "Watcher time limit
 	// exceeded" when the watcher itself was starved.  Neither is a judging bug -
@@ -143,7 +157,7 @@ class JudgingSoakTest : public QObject {
 	// stay identical to the unsandboxed rounds above.
 	void testSandboxedRoundsKeepTheirVerdicts() {
 #ifdef Q_OS_WIN
-		Settings *settings = JudgingTestUtil::createSettings(soakThreads());
+		Settings *settings = JudgingTestUtil::createSettings(sandboxSoakThreads());
 		for (Compiler *compiler : settings->getCompilerList()) {
 			// Keep the interpreter out of the sandbox: granting a Python installation
 			// costs a long one-time ACL walk that is not what this test covers.
@@ -156,7 +170,7 @@ class JudgingSoakTest : public QObject {
 			// time limit costs nothing here and keeps a starved but correct guest
 			// from being reported as a judging failure.  Timings themselves are
 			// pinned by test1, which judges the fixture once without the sandbox.
-			compiler->setTimeLimitRatio(3.0);
+			compiler->setTimeLimitRatio(6.0);
 			SandboxSettings sandbox;
 			sandbox.enabled = true;
 			sandbox.runtime = SandboxSettings::Native;
