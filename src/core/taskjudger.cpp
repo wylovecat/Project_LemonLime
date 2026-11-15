@@ -595,7 +595,8 @@ void TaskJudger::judgeSingleCase(int subtask, int index, const QString &contesta
 	caseJudger->setCancellation(cancellation);
 	caseJudger->setExtraTimeRatio(settings->getDefaultExtraTimeRatio());
 	caseJudger->setWorkingDirectory(workingDirectory);
-	caseJudger->setSandboxConfiguration(sandboxSettings, runtimeExecutable, runtimeEnvironment, sandboxSession);
+	caseJudger->setSandboxConfiguration(sandboxSettings, runtimeExecutable, runtimeEnvironment,
+	                                    sandboxSession);
 	QStringList entryList =
 	    QDir(QDir::toNativeSeparators(temporaryDir.path()) + QDir::separator() + contestantName)
 	        .entryList(QDir::Files);
