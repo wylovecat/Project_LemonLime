@@ -1038,6 +1038,11 @@ class WindowsSandboxTests : public QObject {
 		const auto interpreter = basePythonExecutable();
 		QVERIFY2(! interpreter.isEmpty(), "Cannot locate the base Python interpreter");
 		auto cfg = config({});
+		// The hosted runners grant ACLs over a whole CI Python installation (thousands of
+		// files); under load that exceeded the 15 s default.  This test is about the
+		// runtime working inside the sandbox, and the budget itself is covered by
+		// preparationDeadlineIgnoresStopFlag(), so give it the maximum the settings allow.
+		cfg.sandboxSettings.preparationTimeLimit = 120000;
 		cfg.sandboxSession = session;
 		cfg.executableFile = cfg.runtimeExecutable = interpreter;
 		cfg.arguments = "answer.py";
@@ -1068,6 +1073,9 @@ class WindowsSandboxTests : public QObject {
 		const auto interpreter = basePythonExecutable();
 		QVERIFY2(! interpreter.isEmpty(), "Cannot locate the base Python interpreter");
 		auto cfg = config("child.py");
+		// A CI Python installation is large enough that granting the runtime tree can
+		// exceed the 15 s default on a loaded runner; see pythonRuntime().
+		cfg.sandboxSettings.preparationTimeLimit = 120000;
 		cfg.executableFile = cfg.runtimeExecutable = interpreter;
 		cfg.sandboxSettings.runtime = SandboxSettings::Python;
 		QVERIFY(write(cfg.workingDirectory + "child.py",
@@ -1100,6 +1108,9 @@ class WindowsSandboxTests : public QObject {
 		QVERIFY(create.waitForFinished(kToolWaitMs));
 		QCOMPARE(create.exitCode(), 0);
 		auto cfg = config("answer.py");
+		// The venv's interpreter pulls the base installation into the runtime roots;
+		// granting that tree can exceed the 15 s default on a loaded runner.
+		cfg.sandboxSettings.preparationTimeLimit = 120000;
 		cfg.executableFile = cfg.runtimeExecutable = directory + "/Scripts/python.exe";
 		cfg.sandboxSettings.runtime = SandboxSettings::Python;
 		QVERIFY(write(cfg.workingDirectory + "answer.py",
