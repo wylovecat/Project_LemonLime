@@ -31,9 +31,14 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
+          # qt6-httpserver-dev/qt6-websockets-dev: the embedded online submission
+          # service (ENABLE_ONLINE_SERVER defaults to ON and hard-errors at configure
+          # time without Qt6::HttpServer) and its server-smoke test.
+          # bubblewrap: the judging tests run every submission under bwrap on Linux.
           sudo apt-get install -y build-essential cmake ninja-build pkgconf lsb-release python3 \
             qt6-base-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools qt6-svg-dev \
-            qt6-image-formats-plugins qt6-translations-l10n
+            qt6-image-formats-plugins qt6-translations-l10n \
+            qt6-httpserver-dev qt6-websockets-dev bubblewrap
       - name: Prepare artifact name
         id: artifact_name
         uses: ./.github/actions/artifact-name
