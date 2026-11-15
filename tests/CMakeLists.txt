@@ -1,4 +1,8 @@
-add_subdirectory(test1)
+find_package(Qt${LEMON_QT_MAJOR_VERSION} ${LEMON_QT_MIN_VERSION} COMPONENTS Test REQUIRED)
+
+add_subdirectory(integrated-test)
+add_subdirectory(judging-controller)
+add_subdirectory(cpu-topology)
 
 # Judging regression targets: pure logic, parallel equivalence, case-level
 # parallelism and stop latency.

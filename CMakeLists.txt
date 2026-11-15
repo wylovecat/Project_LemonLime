@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16.0)
+cmake_minimum_required(VERSION 3.20.0)
 
 project(lemon LANGUAGES CXX)
 
@@ -38,7 +38,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_SOURCE_DIR}/src/forms)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -287,8 +287,6 @@ set(QRC_RESOURCES
     )
 
 set(LEMON_FULL_SOURCES
-    ${LEMON_BASE_SOURCES}
-    ${LEMON_CORE_SOURCES}
     ${LEMON_SERVER_SOURCES}
     ${LEMON_UI_SOURCES}
     assets/lemon.rc
@@ -352,7 +350,7 @@ if(ENABLE_LTO)
     check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT error)
 
     if(LTO_SUPPORTED)
-        set_property(TARGET lemon PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+        set_property(TARGET lemon lemon-base lemon-core PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     else()
         message(STATUS "IPO / LTO not supported, disabled")
     endif()

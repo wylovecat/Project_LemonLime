@@ -6,70 +6,74 @@
  */
 
 #include "judgingcontroller.h"
+#include "base/settings.h"
 #include "core/contestant.h"
+#include "core/taskjudger.h"
 #include "sleepinhibitor.h"
 
+#include <QtConcurrent/QtConcurrentRun>
 #include <QtMath>
 
-#define LEMON_MODULE_NAME "JudgingController"
-
-JudgingController::JudgingController(Settings *settings, QObject *parent) : QObject(parent) {
-	isJudging = false;
+JudgingController::JudgingController(const Settings *settings, QObject *parent)
+    : QObject(parent), preventSleepWhileJudging(settings->getPreventSleepWhileJudging()) {
 	maxJudgingThreads = qMax(1, settings->getMaxJudgingThreads());
 	maxThreads = maxJudgingThreads;
 	caseWorkers = 1;
-	preventSleepWhileJudging = settings->getPreventSleepWhileJudging();
+	threadPool.setMaxThreadCount(maxJudgingThreads);
 }
 
-JudgingController::~JudgingController() = default;
+JudgingController::~JudgingController() {
+	stop();
+	threadPool.waitForDone();
+}
+
+void JudgingController::addTask(TaskJudger *judger, Contestant *contestant, int taskId) {
+	judger->setParent(this);
+	queuingTasks.enqueue({judger, contestant, taskId});
+}
 
 void JudgingController::assign() {
-	if (! isJudging) {
-		return;
+	while (isJudging && ! queuingTasks.isEmpty() && runningTasks.size() < maxThreads) {
+		const auto task = queuingTasks.dequeue();
+		// The task is not running yet, so setting its case budget here cannot race with
+		// judge() reading it.
+		task.judger->setCaseWorkers(caseWorkers);
+		auto *watcher = new QFutureWatcher<TaskResult>(this);
+		connect(watcher, &QFutureWatcher<TaskResult>::finished, this,
+		        [this, watcher] { finishTask(watcher); });
+		runningTasks.insert(watcher, task);
+		watcher->setFuture(
+		    QtConcurrent::run(&threadPool, [judger = task.judger](QPromise<TaskResult> &promise) {
+			    promise.addResult(judger->judgeIt(promise));
+		    }));
 	}
-	if (queuingTasks.empty())
-		return;
-	QThread *thread = new QThread;
-	auto *taskJudger = queuingTasks.front();
-	queuingTasks.pop_front();
-	// The task is not running yet, so setting its case budget here cannot race with
-	// judge() reading it.
-	taskJudger->setCaseWorkers(caseWorkers);
-	taskJudger->moveToThread(thread);
-	connect(taskJudger, &TaskJudger::judgingFinished, this, &JudgingController::taskFinished);
-	runningTasks[taskJudger] = thread;
-	thread->start();
-	QMetaObject::invokeMethod(taskJudger, &TaskJudger::judgeIt);
 }
 
-void JudgingController::taskFinished() {
-	auto *taskJudger = qobject_cast<TaskJudger *>(sender());
-	if (taskJudger == nullptr) {
-		return;
+void JudgingController::finishTask(QFutureWatcher<TaskResult> *watcher) {
+	const auto task = runningTasks.take(watcher);
+	if (watcher->isCanceled()) {
+		task.contestant->setCheckJudged(task.taskId, false);
+	} else {
+		task.contestant->applyResult(task.taskId, watcher->result());
 	}
-	if (runningTasks.count(taskJudger)) {
-		auto *thread = runningTasks[taskJudger];
-		thread->quit();
-		thread->wait();
-		delete thread;
-		runningTasks.remove(taskJudger);
-		delete taskJudger;
-	}
+	delete task.judger;
+	watcher->deleteLater();
+	emit taskJudged();
 	assign();
-	if (runningTasks.empty()) {
+	if (runningTasks.isEmpty() && queuingTasks.isEmpty()) {
 		isJudging = false;
 		sleepInhibitor.reset();
 		emit judgeFinished();
 	}
 }
+
 void JudgingController::start() {
-	if (queuingTasks.size() == 0) {
+	if (queuingTasks.isEmpty()) {
 		emit judgeFinished();
 		return;
 	}
-	if (preventSleepWhileJudging && ! sleepInhibitor)
+	if (preventSleepWhileJudging)
 		sleepInhibitor = std::make_unique<SleepInhibitor>(tr("Judging submissions"));
-	isJudging = true;
 	// maxJudgingThreads is the total number of test cases that may run at once, and it
 	// is split between the tasks in flight and the cases inside each of them.  Rejudging
 	// a single submission - the common case - puts everything into that one task, so its
@@ -78,25 +82,24 @@ void JudgingController::start() {
 	// once it has started, so the split is decided here, when the queue is known.
 	maxThreads = qMin(maxJudgingThreads, qMax(1, int(queuingTasks.size())));
 	caseWorkers = qMax(1, maxJudgingThreads / maxThreads);
-	while (! queuingTasks.empty() && runningTasks.size() < maxThreads) {
-		assign();
-	}
+	isJudging = true;
+	assign();
 }
+
 void JudgingController::stop() {
 	if (! isJudging)
 		return;
 	isJudging = false;
-	for (auto [taskJudger, thread] : runningTasks.toStdMap()) {
-		// Direct: TaskJudger lives in its own QThread, which is blocked inside
-		// QThread::wait() while a test case runs.  A queued call would sit in that
-		// thread's event queue until the case finished, i.e. stopping would still
-		// wait for the current case's time limit.
-		QMetaObject::invokeMethod(taskJudger, &TaskJudger::stop, Qt::DirectConnection);
+	// Cancelling the future is what reaches the running test cases: CaseJudger and the
+	// process runners poll it, so stopping does not wait for the current case's time
+	// limit.
+	for (auto *watcher : runningTasks.keys()) {
+		// Preserve results that finished before the stop request reached the GUI.
+		if (! watcher->isFinished())
+			watcher->cancel();
 	}
 	// Tasks that never started are owned by this controller and would otherwise leak;
 	// assign() will not pick them up again because isJudging is now false.
 	while (! queuingTasks.isEmpty())
-		delete queuingTasks.dequeue();
-	// emit judgeFinished();
+		delete queuingTasks.dequeue().judger;
 }
-void JudgingController::addTask(TaskJudger *taskJudger) { queuingTasks.push_back(taskJudger); }

@@ -16,6 +16,7 @@
 #include "base/LemonLog.hpp"
 #include "base/LemonPortable.hpp"
 #include "base/LemonTranslator.hpp"
+#include "base/LemonUtils.hpp"
 #include "base/compiler.h"
 #include "base/settings.h"
 #include "component/exportutil/exportutil.h"
@@ -915,12 +916,6 @@ void LemonLime::addTaskWithScoreScale(const QString &title,
 	}
 }
 
-auto LemonLime::compareFileName(const std::pair<QString, QString> &a, const std::pair<QString, QString> &b)
-    -> bool {
-	return (a.first.length() < b.first.length()) ||
-	       (a.first.length() == b.first.length() && QString::localeAwareCompare(a.first, b.first) < 0);
-}
-
 void LemonLime::addTasksAction() {
 	QStringList list = QDir(Settings::dataPath()).entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 	QSet<QString> nameSet;
@@ -967,7 +962,7 @@ void LemonLime::addTasksAction() {
 				}
 			}
 
-			std::sort(cases.begin(), cases.end(), compareFileName);
+			std::ranges::sort(cases, Lemon::common::lessFileName, &std::pair<QString, QString>::first);
 
 			if (! cases.isEmpty()) {
 				nameList.append(list[i]);

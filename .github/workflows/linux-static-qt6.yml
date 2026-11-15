@@ -38,10 +38,6 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
 
     steps:
-      - name: Get the version
-        id: get_version
-        shell: bash
-        run: echo "VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_OUTPUT
       - name: Install Build Essentials
         run: |
           sed -i 's|http://archive.ubuntu.com|http://ubuntu-archive-asm.trafficmanager.net|g' /etc/apt/sources.list
@@ -60,6 +56,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: "recursive"
+      - name: Trust checkout in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Install build dependencies
         run: |
           apt update
@@ -74,6 +72,14 @@ jobs:
           cd ..
           wget https://github.com/Project-LemonLime/qt5ci/releases/latest/download/qt-6.12-static-linux.tar.gz
           tar -zxvf qt-6.12-static-linux.tar.gz
+      - name: Prepare artifact name
+        id: artifact_name
+        uses: ./.github/actions/artifact-name
+        with:
+          platform: linux
+          arch: x64
+          build-type: ${{ matrix.build_type }}
+          qmake: ../qt6/bin/bin/qmake
       - name: Build
         run: |
           cd ..
@@ -93,9 +99,11 @@ jobs:
           cd ../build
           cmake --build . --target package --parallel $(nproc)
           cd ../Project_LemonLime
-          cp ../build/lemon ./
+          cp ../build/lemon "${{ steps.artifact_name.outputs.name }}"
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: LemonLime-linux-qt6-x86_64-${{ matrix.build_type }}
-          path: lemon
+          path: ${{ steps.artifact_name.outputs.name }}
+          archive: false
+          if-no-files-found: error

@@ -1,0 +1,235 @@
+/*
+ * SPDX-FileCopyrightText: 2019-2022 Project LemonLime
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ */
+
+#include "base/LemonLog.hpp"
+#include "base/compiler.h"
+#include "base/settings.h"
+#include "core/contest.h"
+#include "core/contestant.h"
+#include "core/task.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+
+#include "../common/judging_test_util.hpp"
+
+#include <QDir>
+#include <QDirIterator>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QScopeGuard>
+#include <QStandardPaths>
+#include <QTemporaryDir>
+#include <QtTest>
+#include <atomic>
+
+class IntegratedTest : public QObject {
+	Q_OBJECT
+
+  private:
+	QJsonObject contestJson;
+
+  private slots:
+	void initTestCase() {
+		Lemon::base::logger = spdlog::stdout_color_mt("integrated-test");
+
+		QFile file(QString(TEST_DATA_DIR) + "/TestContest1.cdf");
+		QVERIFY2(file.open(QFile::ReadOnly), qPrintable(file.errorString()));
+		QJsonParseError error;
+		const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
+		QCOMPARE(error.error, QJsonParseError::NoError);
+		QVERIFY(document.isObject());
+		contestJson = document.object();
+	}
+
+	void cdfRoundTrip() {
+		Settings settings;
+		Contest original;
+		original.setSettings(&settings);
+		QCOMPARE(original.readFromJson(contestJson), 0);
+
+		QJsonObject saved;
+		original.writeToJson(saved);
+		const QJsonDocument document = QJsonDocument::fromJson(QJsonDocument(saved).toJson());
+		Contest restored;
+		restored.setSettings(&settings);
+		QCOMPARE(restored.readFromJson(document.object()), 0);
+
+		// Fixed expectations also catch a reader and writer that both omit the same field.
+		for (const Contest *contest : {&original, &restored}) {
+			QCOMPARE(contest->getContestTitle(), QString("TestContest1"));
+			QStringList taskNames;
+			QList<qsizetype> testCaseCounts;
+			for (const Task *task : contest->getTaskList()) {
+				taskNames.append(task->getProblemTitle());
+				testCaseCounts.append(task->getTestCaseList().size());
+			}
+			QCOMPARE(taskNames, QStringList({"aplusb", "helloworld"}));
+			QCOMPARE(testCaseCounts, QList<qsizetype>({1, 6}));
+			QStringList contestantNames;
+			for (const Contestant *contestant : contest->getContestantList())
+				contestantNames.append(contestant->getContestantName());
+			QCOMPARE(contestantNames, QStringList({"user1", "user2"}));
+		}
+	}
+
+	void compilerConfiguration_data() {
+		QTest::addColumn<QString>("savedConfiguration");
+		QTest::addColumn<QString>("expectedConfiguration");
+
+		QTest::newRow("missing-compiler") << QString() << QString("default");
+		QTest::newRow("missing-configuration") << QString("remote-only") << QString("default");
+		QTest::newRow("empty-configuration") << QString("") << QString("default");
+		QTest::newRow("custom-configuration") << QString("custom") << QString("custom");
+		QTest::newRow("disabled-compiler") << QString("disable") << QString("disable");
+	}
+
+	void compilerConfiguration() {
+		QFETCH(QString, savedConfiguration);
+		QFETCH(QString, expectedConfiguration);
+
+		QJsonObject configuration{{"obsolete-compiler", "default"}};
+		if (! savedConfiguration.isNull())
+			configuration.insert("g++", savedConfiguration);
+		QJsonObject input = contestJson;
+		QJsonArray tasks = input["tasks"].toArray();
+		for (qsizetype i = 0; i < tasks.size(); ++i) {
+			QJsonObject task = tasks[i].toObject();
+			task.insert("compilerConfiguration", configuration);
+			tasks[i] = task;
+		}
+		input["tasks"] = tasks;
+
+		Compiler compiler;
+		compiler.setCompilerName("g++");
+		compiler.addConfiguration("default", "%s.* -o %s", "");
+		compiler.addConfiguration("custom", "%s.* -o %s -O2", "");
+		Settings settings;
+		settings.addCompiler(&compiler);
+		Contest contest;
+		contest.setSettings(&settings);
+		QCOMPARE(contest.readFromJson(input), 0);
+		QCOMPARE(contest.getTaskList().size(), tasks.size());
+		for (const Task *task : contest.getTaskList()) {
+			QCOMPARE(task->getCompilerConfiguration("g++"), expectedConfiguration);
+			QVERIFY(task->getCompilerConfiguration("obsolete-compiler").isEmpty());
+		}
+	}
+
+	void judgeAll_data() {
+		QTest::addColumn<int>("maxThreads");
+		QTest::newRow("single-thread") << 1;
+		QTest::newRow("three-threads") << 3;
+	}
+
+	void judgeAll() {
+		QFETCH(int, maxThreads);
+		const QString cppPath = QStandardPaths::findExecutable("g++");
+		QVERIFY2(! cppPath.isEmpty(), "g++ must be available on PATH");
+		QString pythonPath = QStandardPaths::findExecutable("python3");
+		if (pythonPath.isEmpty())
+			pythonPath = QStandardPaths::findExecutable("python");
+		QVERIFY2(! pythonPath.isEmpty(), "python3 or python must be available on PATH");
+
+		Compiler cpp;
+		cpp.setCompilerName("g++");
+		cpp.setSourceExtensions("cpp;cc;cxx");
+		cpp.setCompilerLocation(cppPath);
+		cpp.addConfiguration("default", "%s.* -o %s -O2 -lm", "");
+		Compiler python;
+		python.setCompilerType(Compiler::InterpretiveWithoutByteCode);
+		python.setCompilerName("python");
+		python.setSourceExtensions("py");
+		python.setInterpreterLocation(pythonPath);
+		python.setTimeLimitRatio(2.0);
+		python.addConfiguration("default", "", "%s.py");
+
+		// Keep the fixture independent of the user's saved application settings.
+		Settings settings;
+		// Generous on purpose: a cold CI runner pays the one-time start-up cost of
+		// the whole tool chain on the very first compile, which was measured above
+		// 20 s on windows-latest, while later compiles of the same file take a few
+		// seconds.  With a tight limit the first task of the contest fails to
+		// compile and every expectation below collapses.
+		settings.setCompileTimeLimit(60000);
+		settings.setSpecialJudgeTimeLimit(10000);
+		settings.setFileSizeLimit(50);
+		settings.setRejudgeTimes(1);
+		settings.setMaxJudgingThreads(maxThreads);
+		settings.setDefaultExtraTimeRatio(0.2);
+		settings.setPreventSleepWhileJudging(false);
+		settings.addCompiler(&cpp);
+		settings.addCompiler(&python);
+
+		QTemporaryDir workingDirectory;
+		QVERIFY(workingDirectory.isValid());
+		const QDir fixtureDirectory(TEST_DATA_DIR);
+		QDirIterator files(fixtureDirectory.absolutePath(), QDir::Files, QDirIterator::Subdirectories);
+		while (files.hasNext()) {
+			const QString source = files.next();
+			const QString destination = workingDirectory.filePath(fixtureDirectory.relativeFilePath(source));
+			QVERIFY2(QDir().mkpath(QFileInfo(destination).absolutePath()), qPrintable(destination));
+			QVERIFY2(QFile::copy(source, destination), qPrintable(source));
+		}
+		const auto restoreDirectory =
+		    qScopeGuard([previousDirectory = QDir::currentPath()] { QDir::setCurrent(previousDirectory); });
+		QVERIFY(QDir::setCurrent(workingDirectory.path()));
+
+		Contest contest;
+		contest.setSettings(&settings);
+		QCOMPARE(contest.readFromJson(contestJson), 0);
+		contest.refreshContestantList();
+		QCOMPARE(contest.getTaskList().size(), 2);
+		QCOMPARE(contest.getTask(0)->getProblemTitle(), QString("aplusb"));
+		QCOMPARE(contest.getTask(1)->getProblemTitle(), QString("helloworld"));
+		QCOMPARE(contest.getContestantList().size(), 2);
+		std::atomic_int finishedTasks = 0;
+		std::atomic_bool finishedOnMainThread = true;
+		connect(
+		    &contest, &Contest::taskJudgingFinished, this,
+		    [&] {
+			    ++finishedTasks;
+			    if (QThread::currentThread() != thread())
+				    finishedOnMainThread = false;
+		    },
+		    Qt::DirectConnection);
+		contest.judgeAll();
+		QCOMPARE(finishedTasks.load(), 4);
+		QVERIFY(finishedOnMainThread);
+
+		// Compile states are asserted here; the verdict matrix lives in one place,
+		// tests/common/judging_test_util.hpp, so this target and the repeated-round
+		// targets cannot drift apart.  The matrix also carries the tolerance for a
+		// loaded host (a watcher that ran out of time, a memory hungry guest the
+		// sandbox could not start) and the CompileFailed row a broken submission now
+		// reports instead of an empty result table.
+		struct ExpectedCompile {
+			const char *contestant;
+			int task;
+			CompileState compilation;
+		};
+		const QList<ExpectedCompile> expectedCompile = {
+		    {"user1", 0, CompileSuccessfully},
+		    {"user2", 0, NoValidSourceFile},
+		    {"user1", 1, CompileSuccessfully},
+		    {"user2", 1, CompileSuccessfully},
+		};
+		for (const ExpectedCompile &row : expectedCompile) {
+			const Contestant *contestant = contest.getContestant(row.contestant);
+			QVERIFY2(contestant != nullptr, row.contestant);
+			QVERIFY2(contestant->getCheckJudged(row.task), row.contestant);
+			QCOMPARE(contestant->getCompileState(row.task), row.compilation);
+		}
+
+		const QString matrixError = JudgingTestUtil::verifyTestContest1Matrix(&contest);
+		QVERIFY2(matrixError.isEmpty(), qPrintable(matrixError));
+	}
+};
+
+QTEST_GUILESS_MAIN(IntegratedTest)
+#include "main.moc"

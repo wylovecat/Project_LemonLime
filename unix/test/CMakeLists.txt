@@ -1,8 +1,8 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.20.0)
 
 project(lemon_watcher_unix_test)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -18,6 +18,7 @@ file(COPY hello.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 add_executable(tle tle.c)
 add_executable(add add.c)
 add_executable(re re.c)
+add_executable(sleep_tle sleep_tle.c)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/scripts DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -27,6 +28,7 @@ add_test(NAME watcher_run_sh_test COMMAND python3 scripts/run_sh.py)
 add_test(NAME watcher_MLE_static_test COMMAND python3 scripts/mle_static.py)
 add_test(NAME watcher_unlimit_memory_test COMMAND python3 scripts/unlimit.py)
 add_test(NAME watcher_TLE_test COMMAND python3 scripts/tle.py)
+add_test(NAME watcher_wall_clock_TLE_test COMMAND python3 scripts/sleep_tle.py)
 add_test(NAME watcher_filename_with_space_test COMMAND python3 scripts/space.py)
 add_test(NAME watcher_symlink_abs_test COMMAND python3 scripts/symlink_abs.py)
 add_test(NAME watcher_symlink_rel_test COMMAND python3 scripts/symlink_rel.py)

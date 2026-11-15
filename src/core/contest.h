@@ -53,7 +53,6 @@ class Contest : public QObject {
 	Settings *settings{};
 	QList<Task *> taskList;
 	QMap<QString, Contestant *> contestantList;
-	bool stopJudging{};
 	void judge(Contestant *);
 	void judge(const QVector<std::pair<Contestant *, int>> &);
 	void clearPath(const QString &);

@@ -22,8 +22,8 @@ $ git clone https://github.com/Project-LemonLime/Project_LemonLime.git --recursi
 
 | 依赖           | 要求                                                  |
 | -------------- | ----------------------------------------------------- |
-| CMake          | 推荐 3.20 或更高；                                    |
-| C++ 编译器     | 支持 C++17，使用与 Qt 工具包匹配的编译器              |
+| CMake          | 3.20 或更高                                          |
+| C++ 编译器     | 支持 C++23，使用与 Qt 工具包匹配的编译器              |
 | Qt             | 6.8 或更高                                            |
 | Qt 模块        | Core、Gui、Widgets、Network、Svg、LinguistTools、Test |
 | Linux 附加模块 | Qt DBus，用于评测期间向系统申请阻止休眠               |
@@ -38,7 +38,7 @@ git submodule update --init --recursive
 
 ## Windows
 
-安装 Visual Studio 的“使用 C++ 的桌面开发”组件、Windows SDK、CMake、Ninja，以及相应架构的 Qt MSVC 工具包。在 Visual Studio 的 **Developer PowerShell** 中执行：
+安装 Visual Studio 的“使用 C++ 的桌面开发”组件、Windows 10 SDK 或更新版本、CMake、Ninja，以及相应架构的 Qt MSVC 工具包。在 Visual Studio 的 **Developer PowerShell** 中执行：
 
 ```powershell
 cmake -S . -B build -G Ninja `
@@ -53,6 +53,8 @@ build 目录下会生成 lemon.exe。动态链接 Qt 时，使用 `windeployqt` 
 & "<your qt install path>/msvc2022_64/bin/windeployqt.exe" --release build/lemon.exe
 & ./build/lemon.exe
 ```
+
+Windows ARM64 使用 ARM64 MSVC 开发环境与 `msvc2022_arm64` Qt 工具包，构建和部署命令相同。CI 在 `windows-11-arm` 上原生构建 ARM64 主程序，并使用 Qt ActiveQt 保留 XLS 导出。
 
 ## Linux
 
@@ -208,6 +210,18 @@ ldd ./lemon | grep 'not found'    # 应该没有任何输出
 
 推荐使用 `-static` 编译参数，否则学生程序会缺 libstdc++。本仓库的
 `.github/workflows/linux-static-qt6.yml` 就是这样构建的（容器即 ubuntu:20.04）。
+
+Ubuntu 26.04 ARM64 可使用系统 Qt 开发包生成 DEB，CI 使用同名 ARM64 runner：
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_DEB=ON \
+    -DEMBED_TRANSLATIONS=OFF -DEMBED_DOCS=OFF \
+    -DCPACK_DEBIAN_PACKAGE_SHLIBDEPS=ON
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+cmake --build build --target package
+```
 
 ## macOS
 

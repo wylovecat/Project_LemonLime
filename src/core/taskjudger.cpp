@@ -9,8 +9,7 @@
 #include "base/LemonType.hpp"
 #include "base/compiler.h"
 #include "base/settings.h"
-#include "core/contestant.h"
-#include "core/judgingthread.h"
+#include "core/casejudger.h"
 #include "core/subtaskdependencelib.h"
 #include "core/task.h"
 #include "core/testcase.h"
@@ -19,12 +18,11 @@
 #endif
 
 #include <QSysInfo>
-#include <QThread>
-#include <QTimer>
 #include <QtMath>
 
 #include <algorithm>
 #include <atomic>
+#include <memory>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -33,15 +31,13 @@
 
 TaskJudger::TaskJudger(QObject *parent) : QObject(parent) { compileState = NoValidSourceFile; }
 
-void TaskJudger::setSettings(Settings *_settings) { settings = _settings; }
+void TaskJudger::setSettings(const Settings *_settings) { settings = _settings; }
 
-void TaskJudger::setTask(Task *_task) { task = _task; }
+void TaskJudger::setTask(const Task *_task) { task = _task; }
 
-void TaskJudger::setTaskId(int id) { taskId = id; }
+void TaskJudger::setContestantName(QString name) { contestantName = std::move(name); }
 
-void TaskJudger::setContestant(Contestant *contestant) { this->contestant = contestant; }
-
-Contestant *TaskJudger::getContestant() const { return contestant; }
+void TaskJudger::setCaseWorkers(int workers) { caseWorkers = qMax(1, workers); }
 
 // Get executable file
 auto TaskJudger::traditionalTaskPrepare() -> bool {
@@ -49,16 +45,17 @@ auto TaskJudger::traditionalTaskPrepare() -> bool {
 
 	// Get the source code of contestant
 	compileState = NoValidSourceFile;
-	QString contestantName = contestant->getContestantName();
 	QDir contestantDir;
 	contestantDir =
 	    ! task->getSubFolderCheck()
 	        ? QDir(Settings::sourcePath() + contestantName)
 	        : QDir(Settings::sourcePath() + contestantName + QDir::separator() + task->getSourceFileName());
 	QString contestantDirName = contestantDir.path();
-	QList<Compiler *> compilerList = settings->getCompilerList();
+	const QList<Compiler *> &compilerList = settings->getCompilerList();
 
-	for (auto &i : compilerList) {
+	for (const Compiler *i : compilerList) {
+		if (cancellation.isCanceled())
+			return false;
 		if (task->getCompilerConfiguration(i->getCompilerName()) == "disable")
 			continue;
 
@@ -250,6 +247,7 @@ auto TaskJudger::traditionalTaskPrepare() -> bool {
 				}
 				// Why? It's unix Only
 				auto graderArgument = compilerArguments[configurationIndex] + " -pthread";
+				arguments.append(graderArgument);
 				graderArgument.replace("%s.*", mainGraderName);
 				graderArgument.replace("%s", commExecGrader);
 				arguments.append(graderArgument);
@@ -259,6 +257,8 @@ auto TaskJudger::traditionalTaskPrepare() -> bool {
 			}
 
 			for (auto k : arguments) {
+				if (cancellation.isCanceled())
+					return false;
 				QProcess compilerProcess;
 				compilerProcess.setProcessChannelMode(QProcess::MergedChannels);
 				compilerProcess.setProcessEnvironment(environment);
@@ -278,32 +278,20 @@ auto TaskJudger::traditionalTaskPrepare() -> bool {
 				timer.start();
 				bool flag = false;
 
-				while (timer.elapsed() < settings->getCompileTimeLimit()) {
+				while (timer.elapsed() < settings->getCompileTimeLimit() && ! cancellation.isCanceled()) {
 					if (compilerProcess.waitForFinished(10)) {
 						flag = true;
 						break;
-					}
-
-					QCoreApplication::processEvents();
-
-					if (! isJudging) {
-						compilerProcess.kill();
-						return false;
 					}
 				}
 
 				if (! flag) {
 					compilerProcess.kill();
 					compileState = CompileTimeLimitExceeded;
-					// Stop at the first failure: a later command in the batch (a
-					// communication task compiles several files) succeeding must not
-					// overwrite the timeout or hide the error message.
-					break;
 				} else if (compilerProcess.exitCode() != 0) {
 					compileState = CompileError;
 					compileMessage =
 					    QString::fromLocal8Bit(compilerProcess.readAllStandardOutput().constData());
-					break;
 				} else {
 					if (i->getCompilerType() == Compiler::Typical) {
 						if (! QDir(QDir::toNativeSeparators(temporaryDir.path()) + QDir::separator() +
@@ -346,6 +334,8 @@ auto TaskJudger::traditionalTaskPrepare() -> bool {
 		break;
 	}
 
+	if (cancellation.isCanceled())
+		return false;
 	if (compileState != CompileSuccessfully) {
 		emit compileError(task->getTotalTimeLimit(), static_cast<int>(compileState));
 		return false;
@@ -354,43 +344,26 @@ auto TaskJudger::traditionalTaskPrepare() -> bool {
 	return true;
 }
 
-void TaskJudger::judgeIt() {
+TaskResult TaskJudger::judgeIt(QPromise<TaskResult> &promise) {
+	cancellation = promise.future();
+	if (cancellation.isCanceled())
+		return {};
 	qDebug() << "Start Judging";
 	emit judgingStarted(task->getProblemTitle());
-	const bool judged = judge();
-	// Contestant is a main-thread object and its containers are read by the UI while
-	// judging runs. Apply the results on the owning thread so a worker never mutates
-	// state the UI is reading; blocking keeps `this` (and its result members) alive
-	// until the write completes.
-	if (contestant) {
-		const auto type = QThread::currentThread() == contestant->thread() ? Qt::DirectConnection
-		                                                                   : Qt::BlockingQueuedConnection;
-		QMetaObject::invokeMethod(
-		    contestant,
-		    [this, judged]() {
-			    if (judged) {
-				    contestant->setCheckJudged(taskId, true);
-				    contestant->setCompileMessage(taskId, compileMessage);
-				    contestant->setCompileState(taskId, compileState);
-				    contestant->setResult(taskId, result);
-				    contestant->setMessage(taskId, message);
-				    contestant->setTimeUsed(taskId, timeUsed);
-				    contestant->setMemoryUsed(taskId, memoryUsed);
-				    contestant->setScore(taskId, score);
-				    contestant->setInputFiles(taskId, inputFiles);
-				    contestant->setSourceFile(taskId, sourceFile);
-			    } else {
-				    contestant->setCheckJudged(taskId, false);
-			    }
-		    },
-		    type);
-	}
-	emit judgingFinished();
+	const bool judged = judge() && ! cancellation.isCanceled();
+	return {.judged = judged,
+	        .compileState = compileState,
+	        .compileMessage = std::move(compileMessage),
+	        .sourceFile = std::move(sourceFile),
+	        .inputFiles = std::move(inputFiles),
+	        .result = std::move(result),
+	        .message = std::move(message),
+	        .score = std::move(score),
+	        .timeUsed = std::move(timeUsed),
+	        .memoryUsed = std::move(memoryUsed)};
 }
 
 int TaskJudger::judge() {
-	isJudging = true;
-	QString contestantName = contestant->getContestantName();
 	if (! temporaryDir.isValid())
 		return 0;
 
@@ -439,8 +412,7 @@ int TaskJudger::judge() {
 	// A Windows sandbox session is a shared, ACL-backed resource.  Its preparation is
 	// serialized inside WindowsSandbox, and each running case borrows its own AppContainer
 	// profile from the session, so cases may overlap.
-	int workers = caseWorkers;
-	workers = qMax(1, workers);
+	const int workers = qMax(1, caseWorkers);
 
 	const int subtaskCount = task->getTestCaseList().size();
 	// Verdicts are staged here and copied into the result tables by the replay below;
@@ -450,10 +422,8 @@ int TaskJudger::judge() {
 		outcomes.append(QList<CaseOutcome>(task->getTestCase(i)->getInputFiles().size()));
 
 	for (int first = 0; first < subtaskCount;) {
-		QCoreApplication::processEvents();
-		if (! isJudging) {
+		if (cancellation.isCanceled())
 			return 0;
-		}
 
 		// Which sub tasks may be judged together: one that depends on a sub task of the
 		// same group would read that dependency's status before it is final, so it has
@@ -505,7 +475,7 @@ int TaskJudger::judge() {
 		}
 
 		// Judge every case of the group's runnable sub tasks, on `workers` threads.
-		if (! runnable.isEmpty() && isJudging) {
+		if (! runnable.isEmpty() && ! cancellation.isCanceled()) {
 			QList<std::pair<int, int>> units;
 			for (int i : runnable)
 				for (int j = 0; j < task->getTestCase(i)->getInputFiles().size(); j++)
@@ -514,7 +484,7 @@ int TaskJudger::judge() {
 			std::atomic<int> nextUnit{0};
 			auto worker = [&]() {
 				for (;;) {
-					if (! isJudging)
+					if (cancellation.isCanceled())
 						return;
 					int index = nextUnit.fetch_add(1);
 					if (index >= units.size())
@@ -545,7 +515,7 @@ int TaskJudger::judge() {
 			auto curTestCase = task->getTestCase(i);
 
 			for (int j = 0; j < curTestCase->getInputFiles().size(); j++) {
-				if (! isJudging)
+				if (cancellation.isCanceled())
 					return 0;
 
 				inputFiles[i][j] = QFileInfo(curTestCase->getInputFiles().at(j)).fileName();
@@ -605,10 +575,6 @@ int TaskJudger::judge() {
 	return 1;
 }
 
-// Judge one test case.  This runs on a worker thread, so it must not touch the result
-// tables, emit signals or pump the event loop - judge() replays the verdict on the
-// judging thread instead.  What it does do is register its JudgingThread, so that
-// stop() interrupts the process rather than waiting for the case's own time limit.
 void TaskJudger::judgeSingleCase(int subtask, int index, const QString &contestantName,
                                  const std::shared_ptr<WindowsSandboxSession> &sandboxSession,
                                  QList<QList<CaseOutcome>> &outcomes) {
@@ -625,13 +591,11 @@ void TaskJudger::judgeSingleCase(int subtask, int index, const QString &contesta
 		return;
 	}
 
-	auto *thread = new JudgingThread();
-	// 上游把建目录检查放到了建 JudgingThread 之前，这里沿用它的顺序：mkdir 失败时不会白建一个对象。
-	// 但 stop() 仍然需要在用例真正开始跑之前拿到指针，所以对象一建好就登记下来。
-	registerJudgingThread(thread);
-	thread->setExtraTimeRatio(settings->getDefaultExtraTimeRatio());
-	thread->setWorkingDirectory(workingDirectory);
-	thread->setSandboxConfiguration(sandboxSettings, runtimeExecutable, runtimeEnvironment, sandboxSession);
+	auto caseJudger = std::make_unique<CaseJudger>();
+	caseJudger->setCancellation(cancellation);
+	caseJudger->setExtraTimeRatio(settings->getDefaultExtraTimeRatio());
+	caseJudger->setWorkingDirectory(workingDirectory);
+	caseJudger->setSandboxConfiguration(sandboxSettings, runtimeExecutable, runtimeEnvironment, sandboxSession);
 	QStringList entryList =
 	    QDir(QDir::toNativeSeparators(temporaryDir.path()) + QDir::separator() + contestantName)
 	        .entryList(QDir::Files);
@@ -642,18 +606,18 @@ void TaskJudger::judgeSingleCase(int subtask, int index, const QString &contesta
 		            workingDirectory + entryList[fileIdx]);
 	}
 
-	thread->setSpecialJudgeTimeLimit(settings->getSpecialJudgeTimeLimit());
-	thread->setDiffPath(settings->getDiffPath());
+	caseJudger->setSpecialJudgeTimeLimit(settings->getSpecialJudgeTimeLimit());
+	caseJudger->setDiffPath(settings->getDiffPath());
 
 	if (task->getTaskType() == Task::Traditional || task->getTaskType() == Task::Interaction ||
 	    task->getTaskType() == Task::Communication || task->getTaskType() == Task::CommunicationExec) {
 		if (interpreterFlag) {
-			thread->setExecutableFile(executableFile);
+			caseJudger->setExecutableFile(executableFile);
 		} else {
-			thread->setExecutableFile(workingDirectory + executableFile);
+			caseJudger->setExecutableFile(workingDirectory + executableFile);
 		}
 
-		thread->setArguments(arguments);
+		caseJudger->setArguments(arguments);
 	}
 
 	if (task->getTaskType() == Task::AnswersOnly) {
@@ -662,88 +626,52 @@ void TaskJudger::judgeSingleCase(int subtask, int index, const QString &contesta
 		fileName += QString(".") + task->getAnswerFileExtension();
 
 		if (! task->getSubFolderCheck())
-			thread->setAnswerFile(Settings::sourcePath() + contestantName + QDir::separator() + fileName);
+			caseJudger->setAnswerFile(Settings::sourcePath() + contestantName + QDir::separator() + fileName);
 		else
-			thread->setAnswerFile(Settings::sourcePath() + contestantName + QDir::separator() +
-			                      task->getSourceFileName() + QDir::separator() + fileName);
+			caseJudger->setAnswerFile(Settings::sourcePath() + contestantName + QDir::separator() +
+			                          task->getSourceFileName() + QDir::separator() + fileName);
 	}
 
-	thread->setTask(task);
-	thread->setInputFile(Settings::dataPath() + curTestCase->getInputFiles().at(index));
-	thread->setOutputFile(Settings::dataPath() + curTestCase->getOutputFiles().at(index));
-	thread->setFullScore(curTestCase->getFullScore());
+	caseJudger->setTask(task);
+	caseJudger->setInputFile(Settings::dataPath() + curTestCase->getInputFiles().at(index));
+	caseJudger->setOutputFile(Settings::dataPath() + curTestCase->getOutputFiles().at(index));
+	caseJudger->setFullScore(curTestCase->getFullScore());
 
 	if (task->getTaskType() != Task::AnswersOnly) {
-		thread->setEnvironment(environment);
-		thread->setTimeLimit(qCeil(curTestCase->getTimeLimit() * compilerTimeLimitRatio));
-		thread->setRawTimeLimit(qCeil(curTestCase->getTimeLimit()));
+		caseJudger->setEnvironment(environment);
+		caseJudger->setTimeLimit(qCeil(curTestCase->getTimeLimit() * compilerTimeLimitRatio));
+		caseJudger->setRawTimeLimit(qCeil(curTestCase->getTimeLimit()));
 
 		if (disableMemoryLimitCheck) {
-			thread->setMemoryLimit(-1);
+			caseJudger->setMemoryLimit(-1);
 		} else {
-			thread->setMemoryLimit(qCeil(curTestCase->getMemoryLimit() * compilerMemoryLimitRatio));
+			caseJudger->setMemoryLimit(qCeil(curTestCase->getMemoryLimit() * compilerMemoryLimitRatio));
 		}
-		thread->setRawMemoryLimit(curTestCase->getMemoryLimit());
+		caseJudger->setRawMemoryLimit(curTestCase->getMemoryLimit());
 
-		thread->setInterpreterAsWatcher(interpreterAsWatcher);
+		caseJudger->setInterpreterAsWatcher(interpreterAsWatcher);
 	}
 
-	// judgeNow() rather than start()/wait(): the pool that called us is already the
-	// concurrency, so a child thread that is started and immediately waited for only
-	// buys a thread creation per test case.
-	thread->judgeNow();
+	caseJudger->run();
 
-	// No QCoreApplication::processEvents() here: it used to be needed because a stop
-	// request arrived as a queued call, which only a pumping event loop would deliver.
-	// stop() is direct now, and pumping the event loop from a worker thread would be
-	// wrong (it could deliver calls into code that is not thread safe).
-	while (isJudging && thread->getNeedRejudge() &&
-	       thread->getJudgeTimes() != settings->getRejudgeTimes() + 1) {
-		thread->judgeNow();
+	// Rejudge on demand, but never after a stop request: the controller discards the
+	// whole task result in that case, so another round would only delay the stop.
+	while (! cancellation.isCanceled() && caseJudger->getNeedRejudge() &&
+	       caseJudger->getJudgeTimes() != settings->getRejudgeTimes() + 1) {
+		caseJudger->run();
 	}
 
-	if (isJudging) {
-		outcome.timeUsed = thread->getTimeUsed();
-		outcome.memoryUsed = thread->getMemoryUsed();
-		outcome.score = thread->getScore();
-		outcome.result = thread->getResult();
-		outcome.message = thread->getMessage();
+	if (! cancellation.isCanceled()) {
+		outcome.timeUsed = caseJudger->getTimeUsed();
+		outcome.memoryUsed = caseJudger->getMemoryUsed();
+		outcome.score = caseJudger->getScore();
+		outcome.result = caseJudger->getResult();
+		outcome.message = caseJudger->getMessage();
 	}
-
-	unregisterJudgingThread(thread);
-	delete thread;
 }
 
 void TaskJudger::makeDialogAlert(QString msg) { emit dialogAlert(std::move(msg)); }
 void TaskJudger::taskSkipped(const std::pair<int, int> &cur) {
-	emit singleCaseFinished(contestant->getContestantName(), task->getTestCase(cur.first)->getTimeLimit(),
-	                        cur.first, cur.second, int(result[cur.first][cur.second]), 0, 0, 0);
-}
-
-void TaskJudger::setCaseWorkers(int workers) { caseWorkers = qMax(1, workers); }
-
-void TaskJudger::registerJudgingThread(JudgingThread *thread) {
-	QMutexLocker locker(&currentThreadMutex);
-	runningJudgingThreads.append(thread);
-}
-
-void TaskJudger::unregisterJudgingThread(JudgingThread *thread) {
-	QMutexLocker locker(&currentThreadMutex);
-	runningJudgingThreads.removeAll(thread);
-}
-
-void TaskJudger::stop() {
-	isJudging = false;
-	// Also interrupt the processes running the current test cases; otherwise stopping
-	// would wait until each of them reached its own time limit.
-	//
-	// This is reached through JudgingController::stop() with Qt::DirectConnection,
-	// so it runs on the caller's thread while the judging threads are blocked inside
-	// QThread::wait() and cannot process queued calls.  The mutex is what makes that
-	// safe: it keeps the pointers alive across the dereference, because every
-	// JudgingThread is unregistered before it is deleted.
-	QMutexLocker locker(&currentThreadMutex);
-	for (auto *thread : std::as_const(runningJudgingThreads))
-		if (thread)
-			thread->stop();
+	emit singleCaseFinished(contestantName, task->getTestCase(cur.first)->getTimeLimit(), cur.first,
+	                        cur.second, int(result[cur.first][cur.second]), 0, 0, 0);
 }

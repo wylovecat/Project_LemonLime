@@ -8,7 +8,7 @@
 
 #include "../common/judging_test_util.hpp"
 
-#include "core/judgingthread.h"
+#include "core/casejudger.h"
 
 #include <QJsonObject>
 #include <QtTest>
@@ -19,13 +19,13 @@ class JudgingUnitTest : public QObject {
   private slots:
 	void initTestCase() { JudgingTestUtil::initLogger(); }
 
-	// A freshly constructed JudgingThread must already expose defined values.
-	// The stop path (a comparison interrupted because judging was stopped) returns
-	// from a comparator without assigning `result`, so an uninitialised member
-	// would surface there as an arbitrary verdict - and enum value 0 is
-	// CorrectAnswer, the worst possible one to report by accident.
-	void testFreshJudgingThreadState() {
-		JudgingThread thread;
+	// A freshly constructed CaseJudger must already expose defined values.
+	// A cancelled judging round returns from a comparator without assigning
+	// `result`, so an uninitialised member would surface there as an arbitrary
+	// verdict - and enum value 0 is CorrectAnswer, the worst possible one to
+	// report by accident.
+	void testFreshCaseJudgerState() {
+		CaseJudger thread;
 		QCOMPARE(thread.getTimeUsed(), -1);
 		QCOMPARE(thread.getMemoryUsed(), qint64(-1));
 		QCOMPARE(thread.getJudgeTimes(), 0);

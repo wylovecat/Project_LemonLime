@@ -7,106 +7,106 @@
  *
  */
 
-#include "judgingthread.h"
+#include "casejudger.h"
 #include "LemonType.hpp"
 #include "base/LemonLog.hpp"
 #include "base/settings.h"
 #include "core/task.h"
 
-#include <QCoreApplication>
-#include <QDebug>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QTextStream>
-#include <QTime>
 
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 
-#define LEMON_MODULE_NAME "JudgingThread"
+#define LEMON_MODULE_NAME "CaseJudger"
 
-JudgingThread::JudgingThread(QObject *parent) : QThread(parent) {
-	moveToThread(this);
-	// checkRejudgeMode = false;
+namespace {
+
+	// Keep the checker's score/message files outside the contestant-writable
+	// working directory so the contestant cannot tamper with them.
+	auto sandboxExternalFilePath(const QString &workingDirectory, const QString &suffix) -> QString {
+		const QFileInfo directory(QDir::cleanPath(workingDirectory));
+		return directory.dir().filePath(directory.fileName() + suffix);
+	}
+
+} // namespace
+
+CaseJudger::CaseJudger() {
 	needRejudge = false;
-	stopJudging = false;
 	timeUsed = -1;
 	memoryUsed = -1;
 	judgedTimes = 0;
-	// QTime   t =  QTime::currentTime();
-	// qsrand(static_cast<unsigned int>(t.msec() + t.second() * 1000));
 }
 
-/*void JudgingThread::setCheckRejudgeMode(bool check)
-{
-    checkRejudgeMode = check;
-}*/
+void CaseJudger::setCancellation(QFuture<void> future) { cancellation = std::move(future); }
 
-void JudgingThread::setExtraTimeRatio(double ratio) { extraTimeRatio = ratio; }
+void CaseJudger::setExtraTimeRatio(double ratio) { extraTimeRatio = ratio; }
 
-void JudgingThread::setEnvironment(const QProcessEnvironment &env) { environment = env; }
+void CaseJudger::setEnvironment(const QProcessEnvironment &env) { environment = env; }
 
-void JudgingThread::setWorkingDirectory(const QString &directory) { workingDirectory = directory; }
+void CaseJudger::setWorkingDirectory(const QString &directory) { workingDirectory = directory; }
 
-void JudgingThread::setSpecialJudgeTimeLimit(int limit) { specialJudgeTimeLimit = limit; }
+void CaseJudger::setSpecialJudgeTimeLimit(int limit) { specialJudgeTimeLimit = limit; }
 
-void JudgingThread::setExecutableFile(const QString &fileName) { executableFile = fileName; }
+void CaseJudger::setExecutableFile(const QString &fileName) { executableFile = fileName; }
 
-void JudgingThread::setArguments(const QString &argumentsList) { arguments = argumentsList; }
+void CaseJudger::setArguments(const QString &argumentsList) { arguments = argumentsList; }
 
-void JudgingThread::setAnswerFile(const QString &fileName) { answerFile = fileName; }
+void CaseJudger::setAnswerFile(const QString &fileName) { answerFile = fileName; }
 
-void JudgingThread::setInputFile(const QString &fileName) { inputFile = fileName; }
+void CaseJudger::setInputFile(const QString &fileName) { inputFile = fileName; }
 
-void JudgingThread::setOutputFile(const QString &fileName) { outputFile = fileName; }
+void CaseJudger::setOutputFile(const QString &fileName) { outputFile = fileName; }
 
-void JudgingThread::setDiffPath(const QString &path) { diffPath = path; }
+void CaseJudger::setDiffPath(const QString &path) { diffPath = path; }
 
-void JudgingThread::setTask(Task *_task) { task = _task; }
+void CaseJudger::setTask(const Task *_task) { task = _task; }
 
-void JudgingThread::setFullScore(int score) { fullScore = score; }
+void CaseJudger::setFullScore(int score) { fullScore = score; }
 
-void JudgingThread::setTimeLimit(int limit) { timeLimit = limit; }
+void CaseJudger::setTimeLimit(int limit) { timeLimit = limit; }
 
-void JudgingThread::setRawTimeLimit(int limit) { rawTimeLimit = limit; }
+void CaseJudger::setRawTimeLimit(int limit) { rawTimeLimit = limit; }
 
-void JudgingThread::setMemoryLimit(int limit) { memoryLimit = limit; }
+void CaseJudger::setMemoryLimit(int limit) { memoryLimit = limit; }
 
-void JudgingThread::setRawMemoryLimit(int limit) { rawMemoryLimit = limit; }
+void CaseJudger::setRawMemoryLimit(int limit) { rawMemoryLimit = limit; }
 
-void JudgingThread::setInterpreterAsWatcher(bool use) { interpreterAsWatcher = use; }
+void CaseJudger::setInterpreterAsWatcher(bool use) { interpreterAsWatcher = use; }
 
-void JudgingThread::stop() { stopJudging = true; }
-
-void JudgingThread::setSandboxConfiguration(const SandboxSettings &settings, const QString &executable,
-                                            const QProcessEnvironment &environment,
-                                            const std::shared_ptr<WindowsSandboxSession> &session) {
+void CaseJudger::setSandboxConfiguration(const SandboxSettings &settings, const QString &executable,
+                                         const QProcessEnvironment &environment,
+                                         const std::shared_ptr<WindowsSandboxSession> &session) {
 	sandboxSettings = settings;
 	runtimeExecutable = executable;
 	runtimeEnvironment = environment;
 	sandboxSession = session;
 }
 
-auto JudgingThread::getTimeUsed() const -> int { return timeUsed; }
+auto CaseJudger::getTimeUsed() const -> int { return timeUsed; }
 
-auto JudgingThread::getMemoryUsed() const -> qint64 { return memoryUsed; }
+auto CaseJudger::getMemoryUsed() const -> qint64 { return memoryUsed; }
 
-auto JudgingThread::getScore() const -> int { return score; }
+auto CaseJudger::getScore() const -> int { return score; }
 
-auto JudgingThread::getFullScore() const -> int { return fullScore; }
+auto CaseJudger::getFullScore() const -> int { return fullScore; }
 
-auto JudgingThread::getJudgeTimes() const -> int { return judgedTimes; }
+auto CaseJudger::getJudgeTimes() const -> int { return judgedTimes; }
 
-auto JudgingThread::getResult() const -> ResultState { return result; }
+auto CaseJudger::getResult() const -> ResultState { return result; }
 
-auto JudgingThread::getMessage() const -> const QString & { return message; }
+auto CaseJudger::getMessage() const -> const QString & { return message; }
 
-auto JudgingThread::getNeedRejudge() const -> bool { return needRejudge; }
+auto CaseJudger::getNeedRejudge() const -> bool { return needRejudge; }
 
 // Chunked file reader used by the line/space comparators below.
 //
@@ -118,13 +118,14 @@ auto JudgingThread::getNeedRejudge() const -> bool { return needRejudge; }
 class BufferedStreamReader {
 
   public:
-	static const int BUFFER_SIZE = 1 << 18; // 128 KiB
-	explicit BufferedStreamReader(const char *filename) : file(fopen(filename, "r")) {
+	static const int BUFFER_SIZE = 1 << 18; // 256 KiB
+	explicit BufferedStreamReader(const char *filename)
+	    : buffer(new char[BUFFER_SIZE]), file(fopen(filename, "r")) {
 		result.reserve(32);
 		// Start with bufPos == bufEnd so the first peekChar() triggers an
 		// fread; avoids a separate "primed?" flag.
-		bufPos = buffer + BUFFER_SIZE;
-		bufEnd = buffer + BUFFER_SIZE;
+		bufPos = buffer.get() + BUFFER_SIZE;
+		bufEnd = buffer.get() + BUFFER_SIZE;
 		lineNumber = 1;
 		isEof = 0;
 	}
@@ -138,8 +139,9 @@ class BufferedStreamReader {
 	}
 
   private:
+	std::unique_ptr<char[]> buffer;
 	FILE *file;
-	char buffer[BUFFER_SIZE], *bufEnd, *bufPos;
+	char *bufEnd, *bufPos;
 	bool isEof;
 	int lineNumber;
 	std::string result; // Fixed Length String,Optimize for speed
@@ -161,8 +163,8 @@ auto BufferedStreamReader::peekChar() -> char {
 	if (bufPos == bufEnd) {
 		// Buffer drained -- refill. fread returning 0 means real EOF; latch it
 		// so further peekChar() calls short-circuit without touching the FILE*.
-		bufPos = buffer;
-		bufEnd = buffer + fread(buffer, 1, BUFFER_SIZE, file);
+		bufPos = buffer.get();
+		bufEnd = buffer.get() + fread(buffer.get(), 1, BUFFER_SIZE, file);
 		if (bufPos == bufEnd) {
 			isEof = true;
 			return '\0';
@@ -227,7 +229,7 @@ auto BufferedStreamReader::nextUntilSpace() -> std::string_view {
 	return result;
 }
 
-void JudgingThread::compareLineByLine(const QString &contestantOutput) {
+void CaseJudger::compareLineByLine(const QString &contestantOutput) {
 	BufferedStreamReader contestantReader(contestantOutput.toLocal8Bit().data());
 	BufferedStreamReader standardOutputReader(outputFile.toLocal8Bit().data());
 
@@ -248,6 +250,8 @@ void JudgingThread::compareLineByLine(const QString &contestantOutput) {
 	while (true) {
 		auto contestantLine = contestantReader.nextUntilNewLine();
 		auto standardOutputLine = standardOutputReader.nextUntilNewLine();
+		if (cancellation.isCanceled())
+			return;
 
 		if (contestantReader.eof() && ! standardOutputReader.eof()) {
 			score = 0;
@@ -283,7 +287,7 @@ void JudgingThread::compareLineByLine(const QString &contestantOutput) {
 	result = CorrectAnswer;
 }
 
-void JudgingThread::compareIgnoreSpaces(const QString &contestantOutput) {
+void CaseJudger::compareIgnoreSpaces(const QString &contestantOutput) {
 	BufferedStreamReader contestantReader(contestantOutput.toLocal8Bit().data());
 	BufferedStreamReader standardOutputReader(outputFile.toLocal8Bit().data());
 
@@ -304,6 +308,8 @@ void JudgingThread::compareIgnoreSpaces(const QString &contestantOutput) {
 	while (true) {
 		auto contestantLine = contestantReader.nextUntilSpace();
 		auto standardOutputLine = standardOutputReader.nextUntilSpace();
+		if (cancellation.isCanceled())
+			return;
 
 		if (contestantLine == standardOutputLine) {
 			if (contestantReader.eof() && standardOutputReader.eof())
@@ -347,7 +353,7 @@ void JudgingThread::compareIgnoreSpaces(const QString &contestantOutput) {
 	result = CorrectAnswer;
 }
 
-void JudgingThread::compareWithDiff(const QString &contestantOutput) {
+void CaseJudger::compareWithDiff(const QString &contestantOutput) {
 	QString cmd = diffPath;
 	QStringList cmdArgs =
 	    (QStringList(task->getDiffArguments())
@@ -373,9 +379,9 @@ void JudgingThread::compareWithDiff(const QString &contestantOutput) {
 			finished = true;
 			break;
 		}
-		QCoreApplication::processEvents();
-		if (stopJudging) {
+		if (cancellation.isCanceled()) {
 			diff.kill();
+			diff.waitForFinished(-1);
 			return;
 		}
 	}
@@ -397,7 +403,7 @@ void JudgingThread::compareWithDiff(const QString &contestantOutput) {
 	}
 }
 
-void JudgingThread::compareRealNumbers(const QString &contestantOutput) {
+void CaseJudger::compareRealNumbers(const QString &contestantOutput) {
 	FILE *contestantOutputFile = fopen(contestantOutput.toLocal8Bit().data(), "r");
 
 	if (contestantOutputFile == nullptr) {
@@ -484,9 +490,7 @@ void JudgingThread::compareRealNumbers(const QString &contestantOutput) {
 			return;
 		}
 
-		QCoreApplication::processEvents();
-
-		if (stopJudging) {
+		if (cancellation.isCanceled()) {
 			fclose(contestantOutputFile);
 			fclose(standardOutputFile);
 			return;
@@ -502,7 +506,7 @@ void JudgingThread::compareRealNumbers(const QString &contestantOutput) {
 	fclose(standardOutputFile);
 }
 
-void JudgingThread::lemonSpecialJudge(const QString &fileName) {
+void CaseJudger::lemonSpecialJudge(const QString &fileName) {
 	if (! QFileInfo::exists(inputFile)) {
 		score = 0;
 		result = FileError;
@@ -524,21 +528,24 @@ void JudgingThread::lemonSpecialJudge(const QString &fileName) {
 		return;
 	}
 
-	auto judge = std::make_unique<QProcess>(this);
+	const QString scorePath = sandboxExternalFilePath(workingDirectory, "_score");
+	const QString messagePath = sandboxExternalFilePath(workingDirectory, "_message");
+
+	QProcess judge;
 	QStringList arguments;
 	arguments << inputFile << fileName << outputFile << QString("%1").arg(fullScore);
-	arguments << workingDirectory + "_score";
-	arguments << workingDirectory + "_message";
-	judge->start(Settings::dataPath() + task->getSpecialJudge(), arguments);
+	arguments << scorePath;
+	arguments << messagePath;
+	judge.start(Settings::dataPath() + task->getSpecialJudge(), arguments);
 
-	if (! judge->waitForStarted(-1)) {
+	if (! judge.waitForStarted(-1)) {
 		score = 0;
 		result = InvalidSpecialJudge;
 		return;
 	}
 
-	QFile scoreFile(workingDirectory + "_score");
-	QFile messageFile(workingDirectory + "_message");
+	QFile scoreFile(scorePath);
+	QFile messageFile(messagePath);
 
 	auto removeTempFiles = qScopeGuard([&] {
 		scoreFile.remove();
@@ -550,27 +557,27 @@ void JudgingThread::lemonSpecialJudge(const QString &fileName) {
 	bool flag = false;
 
 	while (timer.elapsed() < specialJudgeTimeLimit) {
-		if (judge->waitForFinished(10)) {
+		if (judge.waitForFinished(10)) {
 			flag = true;
 			break;
 		}
 
-		QCoreApplication::processEvents();
-
-		if (stopJudging) {
-			judge->kill();
+		if (cancellation.isCanceled()) {
+			judge.kill();
+			judge.waitForFinished(-1);
 			return;
 		}
 	}
 
 	if (! flag) {
-		judge->kill();
+		judge.kill();
+		judge.waitForFinished(-1);
 		score = 0;
 		result = SpecialJudgeTimeLimitExceeded;
 		return;
 	}
 
-	if (judge->exitCode() != 0) {
+	if (judge.exitCode() != 0) {
 		score = 0;
 		result = SpecialJudgeRunTimeError;
 		return;
@@ -619,7 +626,7 @@ void JudgingThread::lemonSpecialJudge(const QString &fileName) {
 		result = CorrectAnswer;
 }
 
-void JudgingThread::testlibSpecialJudge(const QString &fileName) {
+void CaseJudger::testlibSpecialJudge(const QString &fileName) {
 	if (! QFileInfo::exists(inputFile)) {
 		score = 0;
 		result = FileError;
@@ -641,19 +648,21 @@ void JudgingThread::testlibSpecialJudge(const QString &fileName) {
 		return;
 	}
 
-	auto judge = std::make_unique<QProcess>(this);
+	const QString scorePath = sandboxExternalFilePath(workingDirectory, "_score");
+
+	QProcess judge;
 	QStringList arguments;
 	arguments << inputFile << fileName << outputFile;
-	judge->setStandardErrorFile(workingDirectory + "_score");
-	judge->start(Settings::dataPath() + task->getSpecialJudge(), arguments);
+	judge.setStandardErrorFile(scorePath);
+	judge.start(Settings::dataPath() + task->getSpecialJudge(), arguments);
 
-	if (! judge->waitForStarted(-1)) {
+	if (! judge.waitForStarted(-1)) {
 		score = 0;
 		result = InvalidSpecialJudge;
 		return;
 	}
 
-	QFile scoreFile(workingDirectory + "_score");
+	QFile scoreFile(scorePath);
 
 	auto removeTempFiles = qScopeGuard([&] { scoreFile.remove(); });
 
@@ -662,21 +671,19 @@ void JudgingThread::testlibSpecialJudge(const QString &fileName) {
 	bool flag = false;
 
 	while (timer.elapsed() < specialJudgeTimeLimit) {
-		if (judge->waitForFinished(10)) {
+		if (judge.waitForFinished(10)) {
 			flag = true;
 			break;
 		}
 
-		QCoreApplication::processEvents();
-
-		if (stopJudging) {
-			judge->kill();
+		if (cancellation.isCanceled()) {
+			judge.kill();
 			return;
 		}
 	}
 
 	if (! flag) {
-		judge->kill();
+		judge.kill();
 		score = 0;
 		result = SpecialJudgeTimeLimitExceeded;
 		return;
@@ -743,7 +750,7 @@ void JudgingThread::testlibSpecialJudge(const QString &fileName) {
 		result = CorrectAnswer;
 }
 
-void JudgingThread::judgeOutput() {
+void CaseJudger::judgeOutput() {
 	QString fileName;
 
 	if (task->getStandardOutputCheck()) {
@@ -779,7 +786,7 @@ void JudgingThread::judgeOutput() {
 	}
 }
 
-void JudgingThread::judgeTraditionalTask() {
+void CaseJudger::judgeTraditionalTask() {
 	if (! QFileInfo::exists(inputFile)) {
 		score = 0;
 		result = FileError;
@@ -809,28 +816,29 @@ void JudgingThread::judgeTraditionalTask() {
 		QFile::remove(workingDirectory + "_tmperr");
 	});
 
-	ProcessRunnerConfig cfg;
-	cfg.executableFile = executableFile;
-	cfg.arguments = arguments;
-	cfg.workingDirectory = workingDirectory;
-	cfg.inputFile = inputFile;
-	cfg.environment = environment;
-	cfg.timeLimit = timeLimit;
-	cfg.rawTimeLimit = rawTimeLimit;
-	cfg.memoryLimit = memoryLimit;
-	cfg.rawMemoryLimit = rawMemoryLimit;
-	cfg.extraTimeRatio = extraTimeRatio;
-	cfg.standardInputCheck = task->getStandardInputCheck();
-	cfg.standardOutputCheck = task->getStandardOutputCheck();
-	cfg.inputFileName = task->getInputFileName();
-	cfg.outputFileName = task->getOutputFileName();
-	cfg.interpreterAsWatcher = interpreterAsWatcher;
-	cfg.sandboxSettings = sandboxSettings;
-	cfg.runtimeExecutable = runtimeExecutable;
-	cfg.runtimeEnvironment = runtimeEnvironment;
-	cfg.sandboxSession = sandboxSession;
+	ProcessRunnerConfig cfg{
+	    .executableFile = executableFile,
+	    .arguments = arguments,
+	    .workingDirectory = workingDirectory,
+	    .inputFile = inputFile,
+	    .environment = environment,
+	    .timeLimit = timeLimit,
+	    .rawTimeLimit = rawTimeLimit,
+	    .memoryLimit = memoryLimit,
+	    .rawMemoryLimit = rawMemoryLimit,
+	    .extraTimeRatio = extraTimeRatio,
+	    .standardInputCheck = task->getStandardInputCheck(),
+	    .standardOutputCheck = task->getStandardOutputCheck(),
+	    .inputFileName = task->getInputFileName(),
+	    .outputFileName = task->getOutputFileName(),
+	    .interpreterAsWatcher = interpreterAsWatcher,
+	    .sandboxSettings = sandboxSettings,
+	    .runtimeExecutable = runtimeExecutable,
+	    .runtimeEnvironment = runtimeEnvironment,
+	    .sandboxSession = sandboxSession,
+	};
 
-	auto processRunner = ProcessRunner::create(cfg, stopJudging);
+	auto processRunner = ProcessRunner::create(cfg, cancellation);
 	auto runResult = processRunner->run();
 	result = runResult.result;
 	score = runResult.score;
@@ -848,7 +856,7 @@ void JudgingThread::judgeTraditionalTask() {
 		message = "";
 	}
 
-	if (stopJudging)
+	if (cancellation.isCanceled())
 		return;
 
 	if (result != CorrectAnswer)
@@ -857,7 +865,7 @@ void JudgingThread::judgeTraditionalTask() {
 	judgeOutput();
 }
 
-void JudgingThread::judgeAnswersOnlyTask() {
+void CaseJudger::judgeAnswersOnlyTask() {
 	switch (task->getComparisonMode()) {
 		case Task::LineByLineMode:
 			compareLineByLine(answerFile);
@@ -885,9 +893,10 @@ void JudgingThread::judgeAnswersOnlyTask() {
 	}
 }
 
-void JudgingThread::run() { judgeNow(); }
+void CaseJudger::run() {
+	if (cancellation.isCanceled())
+		return;
 
-void JudgingThread::judgeNow() {
 	++judgedTimes;
 	needRejudge = false;
 

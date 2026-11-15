@@ -6,45 +6,57 @@
  */
 #pragma once
 
-#include "base/LemonType.hpp"
-#include "base/settings.h"
-#include "taskjudger.h"
+#include "taskresult.h"
 
+#include <QFutureWatcher>
 #include <QMap>
-#include <QMutex>
 #include <QObject>
 #include <QQueue>
-#include <QThread>
+#include <QThreadPool>
 #include <memory>
 
+class Contestant;
+class Settings;
 class SleepInhibitor;
+class TaskJudger;
 
 class JudgingController : public QObject {
 	Q_OBJECT
 
   public:
-	explicit JudgingController(Settings *settings, QObject *parent = nullptr);
+	explicit JudgingController(const Settings *settings, QObject *parent = nullptr);
 	~JudgingController() override;
-	void addTask(TaskJudger *judger);
+	void addTask(TaskJudger *judger, Contestant *contestant, int taskId);
+
+  public slots:
+	void start();
+	void stop();
+
+  signals:
+	void taskJudged();
+	void judgeFinished();
 
   private:
-	QQueue<TaskJudger *> queuingTasks;
-	QMap<TaskJudger *, QThread *> runningTasks;
-	bool isJudging;
+	struct PendingTask {
+		TaskJudger *judger;
+		Contestant *contestant;
+		int taskId;
+	};
+
+	void assign();
+	void finishTask(QFutureWatcher<TaskResult> *watcher);
+
+	QThreadPool threadPool;
+	QQueue<PendingTask> queuingTasks;
+	QMap<QFutureWatcher<TaskResult> *, PendingTask> runningTasks;
+	bool isJudging = false;
+	bool preventSleepWhileJudging;
+	std::unique_ptr<SleepInhibitor> sleepInhibitor;
+
 	// Settings::getMaxJudgingThreads(): the total number of test cases that may be
 	// judged at the same time, split into maxThreads tasks in flight and caseWorkers
 	// cases per task.
 	int maxJudgingThreads;
 	int maxThreads;
 	int caseWorkers;
-	bool preventSleepWhileJudging;
-	std::unique_ptr<SleepInhibitor> sleepInhibitor;
-  public slots:
-	void stop();
-	void taskFinished();
-	void assign();
-	void start();
-
-  signals:
-	void judgeFinished();
 };

@@ -1,13 +1,13 @@
 # ==================================================================================
 # Shared wiring for the judging test targets.
 #
-# Mirrors how tests/test1 is built: Qt Test, the lemon libraries, the spdlog
+# Mirrors how tests/integrated-test is built: Qt Test, the lemon libraries, the spdlog
 # include path, TEST_DATA_DIR pointing at the per-directory data/ copy, and ctest
 # registration.  Include this from a test directory and call
 # lemon_add_judging_test(<name>).
 # ==================================================================================
 
-# NOTE: deliberately no cmake/enable-asan.cmake here (tests/test1 does include it).
+# NOTE: deliberately no cmake/enable-asan.cmake here (tests/integrated-test does include it).
 # These targets link the judging core and pull in spdlog's heavy sink templates via
 # tests/common/judging_test_util.hpp; building that combination with
 # /fsanitize=address makes cl.exe abort with exit code 0xC0000409 on MSVC 14.51

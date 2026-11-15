@@ -29,7 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         #distro: [stable, testing, sid]
-        build_type: [Release, RelWithDebInfo]
+        build_type: [Release, RelWithDebInfo, Debug]
         distro: [testing, sid]
     name: Debian ${{ matrix.distro }}
     runs-on: ubuntu-latest
@@ -40,36 +40,43 @@ jobs:
         run: |
           apt-get update
           apt-get install -y git
-      - name: Get the version
-        id: get_version
-        shell: bash
-        run: echo "VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_OUTPUT
       - name: Checking out sources
         uses: actions/checkout@v6
         with:
           submodules: "recursive"
+      - name: Trust checkout in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Install build dependencies
         run: |
           # qt6-httpserver-dev/qt6-websockets-dev: the embedded online
           # submission service (ENABLE_ONLINE_SERVER defaults to ON and hard-
           # errors at configure time without Qt6::HttpServer).
           apt-get install -y build-essential ninja-build qt6-base-dev qt6-tools-dev qt6-svg-dev qt6-image-formats-plugins qt6-translations-l10n qt6-httpserver-dev qt6-websockets-dev cmake pkgconf bash
+      - name: Prepare artifact name
+        id: artifact_name
+        uses: ./.github/actions/artifact-name
+        with:
+          platform: linux
+          arch: x64
+          build-type: ${{ matrix.build_type }}
+          qmake: qmake6
+          variant: ${{ matrix.distro }}
       - name: Build
         run: |
           mkdir build
           cd build
           cmake .. -GNinja -DEMBED_TRANSLATIONS=OFF -DEMBED_DOCS=OFF -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DBUILD_DEB=ON -DLEMON_BUILD_INFO="Build for Debian" -DLEMON_BUILD_EXTRA_INFO="Build on $(uname -sr)"
           cmake --build . --target package --parallel $(nproc)
-      - name: Get package name
+      - name: Rename package
         shell: bash
-        id: get_package
         run: |
-          echo "NAME=$(basename build/LemonLime-*.deb)" >> $GITHUB_OUTPUT
+          mv build/LemonLime-*.deb "build/${{ steps.artifact_name.outputs.name }}.deb"
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: LemonLime-${{ steps.get_version.outputs.VERSION }}-debian-${{ matrix.distro }}-${{ matrix.build_type }}.deb
-          path: build/${{ steps.get_package.outputs.NAME }}
+          path: build/${{ steps.artifact_name.outputs.name }}.deb
+          archive: false
+          if-no-files-found: error
       - name: Upload binaries to release
         # Only the Release .deb is published; the RelWithDebInfo leg stays a CI
         # artifact. Both distros still upload, so a release carries one .deb for
@@ -78,7 +85,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/${{ steps.get_package.outputs.NAME }}
-          asset_name: LemonLime-${{ steps.get_version.outputs.VERSION }}-debian-${{ matrix.distro }}-${{ matrix.build_type }}.deb
+          file: build/${{ steps.artifact_name.outputs.name }}.deb
+          asset_name: ${{ steps.artifact_name.outputs.name }}.deb
           tag: ${{ github.ref }}
           overwrite: true

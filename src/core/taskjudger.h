@@ -8,21 +8,21 @@
 #pragma once
 
 #include "base/LemonType.hpp"
-#include "core/judgingthread.h"
+#include "base/sandboxsettings.h"
+#include "core/taskresult.h"
 
+#include <QFuture>
 #include <QList>
 #include <QMap>
-#include <QMutex>
 #include <QObject>
-#include <QPointer>
+#include <QProcessEnvironment>
+#include <QPromise>
 #include <QString>
 #include <QStringList>
 #include <QTemporaryDir>
 
-#include <atomic>
 #include <memory>
 
-class Contestant;
 class Settings;
 class Task;
 class WindowsSandboxSession;
@@ -33,22 +33,28 @@ class TaskJudger : public QObject {
 	TaskJudger(QObject *parent = nullptr);
 	// void setCheckRejudgeMode(bool);
 	void setNeedRejudge(const QList<std::pair<int, int>> &);
-	void setSettings(Settings *);
-	void setTask(Task *);
-	void setTaskId(int);
-	void setContestant(Contestant *);
-	Contestant *getContestant() const;
+	void setSettings(const Settings *);
+	void setTask(const Task *);
+	void setContestantName(QString);
 	CompileState getCompileState() const;
 	// const QList< std::pair<int, int> >& getNeedRejudge() const;
+
+	// How many test cases of this task may be judged at the same time.  Set by
+	// JudgingController before the task starts so that (tasks in flight) *
+	// caseWorkers stays within Settings::getMaxJudgingThreads(); a case is CPU
+	// bound, so oversubscribing would make running processes share the CPU and turn
+	// correct solutions into spurious time limit verdicts.
+	void setCaseWorkers(int);
 
   private:
 	// bool checkRejudgeMode;
 
 	const QString commExecGrader = "grader";
 	bool interpreterFlag{};
-	Settings *settings{};
-	Task *task{};
-	Contestant *contestant;
+	const Settings *settings{};
+	const Task *task{};
+	QString contestantName;
+	QFuture<void> cancellation;
 	CompileState compileState;
 	QString compileMessage;
 	QString sourceFile;
@@ -72,15 +78,7 @@ class TaskJudger : public QObject {
 	QList<QStringList> inputFiles;
 
 	QList<int> testCaseScore;
-	// stop() runs on the caller's thread while the judging thread is blocked inside
-	// QThread::wait(), so this flag is written and read by different threads.
-	std::atomic<bool> isJudging{true};
 
-	// How many test cases of this task may be judged at the same time.  Set by
-	// JudgingController so that (tasks in flight) * caseWorkers stays within
-	// Settings::getMaxJudgingThreads(); a case is CPU bound, so oversubscribing would
-	// make running processes share the CPU and turn correct solutions into spurious
-	// time limit verdicts.
 	int caseWorkers{1};
 
 	// Verdict of one test case, computed by a worker thread and only copied into the
@@ -97,15 +95,6 @@ class TaskJudger : public QObject {
 		ResultState result{Skipped};
 	};
 
-	// Every JudgingThread that is currently running, so stop() can interrupt the
-	// processes instead of waiting for them to finish.  currentThreadMutex serialises
-	// the walk in stop() against registering and unregistering, and a thread is always
-	// unregistered before it is deleted - otherwise a stop request arriving between
-	// two test cases would dereference freed memory.
-	QList<JudgingThread *> runningJudgingThreads;
-	QMutex currentThreadMutex;
-
-	int taskId;
 	bool traditionalTaskPrepare();
 	void assign();
 	void taskSkipped(const std::pair<int, int> &);
@@ -114,19 +103,13 @@ class TaskJudger : public QObject {
 	void judgeSingleCase(int subtask, int index, const QString &contestantName,
 	                     const std::shared_ptr<WindowsSandboxSession> &sandboxSession,
 	                     QList<QList<CaseOutcome>> &outcomes);
-	void registerJudgingThread(JudgingThread *);
-	void unregisterJudgingThread(JudgingThread *);
 
 	QTemporaryDir temporaryDir;
 
   public:
-	void judgeIt();
-	void setCaseWorkers(int);
-  public slots:
-	void stop();
+	TaskResult judgeIt(QPromise<TaskResult> &promise);
   signals:
 	void judgingStarted(QString);
-	void judgingFinished();
 	void dialogAlert(QString);
 	void singleCaseFinished(QString, int, int, int, int, int, int, qint64);
 	void singleSubtaskDependenceFinished(int, int, int);
